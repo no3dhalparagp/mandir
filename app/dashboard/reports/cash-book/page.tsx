@@ -176,7 +176,7 @@ export default async function CashBookReportPage({
                 <TableCell></TableCell>
                 <TableCell></TableCell>
                 <TableCell className="text-right text-primary text-lg">
-                  {runningBal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  
                 </TableCell>
               </TableRow>
             </TableBody>
