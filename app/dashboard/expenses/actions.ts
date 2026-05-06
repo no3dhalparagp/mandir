@@ -6,6 +6,22 @@ import { z } from "zod"
 import { ExpenseCategory, PaymentMode } from "@prisma/client"
 import { auth } from "@/auth"
 
+async function recalculateBalancesForAccount(accountId: string) {
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { accountId },
+    orderBy: { date: "asc" },
+  })
+  let balance = 0
+  for (const entry of entries) {
+    const isDebit = ["EXPENSE", "TRANSFER_OUT"].includes(entry.type)
+    balance = isDebit ? balance - entry.amount : balance + entry.amount
+    await prisma.ledgerEntry.update({
+      where: { id: entry.id },
+      data: { runningBalance: balance },
+    })
+  }
+}
+
 const expenseSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters."),
   category: z.nativeEnum(ExpenseCategory),
@@ -49,7 +65,6 @@ export async function createExpense(data: z.infer<typeof expenseSchema>) {
       },
     })
 
-    // Create a ledger entry if approved and has an account
     if (isAutoApproved && validatedData.accountId) {
       await prisma.ledgerEntry.create({
         data: {
@@ -61,6 +76,8 @@ export async function createExpense(data: z.infer<typeof expenseSchema>) {
           referenceId: expense.id,
         },
       })
+
+      await recalculateBalancesForAccount(validatedData.accountId)
     }
 
     revalidatePath("/dashboard/expenses")
@@ -84,7 +101,6 @@ export async function approveExpense(id: string) {
       },
     })
 
-    // Create ledger entry if has account
     if (expense.accountId) {
       await prisma.ledgerEntry.create({
         data: {
@@ -96,6 +112,8 @@ export async function approveExpense(id: string) {
           referenceId: expense.id,
         },
       })
+
+      await recalculateBalancesForAccount(expense.accountId)
     }
 
     revalidatePath("/dashboard/expenses")

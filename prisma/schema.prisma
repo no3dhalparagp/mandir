@@ -83,10 +83,10 @@ enum AccountType {
 }
 
 enum CollectionStatus {
-  COLLECTED       // Member has collected the amount
-  DEPOSITED       // Member has submitted to accountant
-  VERIFIED        // Accountant has verified the amount
-  DISCREPANT      // Amount mismatch found
+  COLLECTED // Member has collected the amount
+  DEPOSITED // Member has submitted to accountant
+  VERIFIED // Accountant has verified the amount
+  DISCREPANT // Amount mismatch found
 }
 
 enum LedgerTransactionType {
@@ -105,284 +105,351 @@ enum ReconciliationStatus {
   COMPLETED
 }
 
+enum COAAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum EntryType {
+  DEBIT
+  CREDIT
+}
+
 // ─── Core User ────────────────────────────────────────────────────────────────
 
 model User {
-  id               String     @id @default(auto()) @map("_id") @db.ObjectId
-  name             String?
-  email            String     @unique
-  password         String
-  role             Role       @default(VIEWER)
-  isActive         Boolean    @default(true)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String?
+  email     String   @unique
+  password  String
+  role      Role     @default(VIEWER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  approvedExpenses   Expense[]           @relation("ApprovedExpenses")
-  verifiedCollections MemberCollection[] @relation("VerifiedCollections")
-  reconciliations    BankReconciliation[] @relation("ReconciledBy")
-  member             Member?
+  approvedExpenses       Expense[]               @relation("ApprovedExpenses")
+  verifiedCollections    MemberCollection[]      @relation("VerifiedCollections")
+  reconciliations        BankReconciliation[]    @relation("ReconciledBy")
+  member                 Member?
+  accountingTransactions AccountingTransaction[]
+}
+
+// ─── Chart of Accounts ─────────────────────────────────────────────────────────
+
+model ChartOfAccount {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  code        String           @unique
+  name        String
+  type        COAAccountType
+  parentId    String?          @db.ObjectId
+  parent      ChartOfAccount?  @relation("ParentAccount", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children    ChartOfAccount[] @relation("ParentAccount")
+  isActive    Boolean          @default(true)
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  bankAccount    BankAccount?
+  journalEntries JournalEntry[]
+}
+
+// ─── Double-Entry Accounting Transaction ───────────────────────────────────────
+
+model AccountingTransaction {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  transactionNo String   @unique
+  date          DateTime @default(now())
+  description   String
+  referenceType String?
+  referenceId   String?
+  status        String   @default("POSTED")
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  createdById String?        @db.ObjectId
+  createdBy   User?          @relation(fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  entries     JournalEntry[]
+}
+
+model JournalEntry {
+  id            String                @id @default(auto()) @map("_id") @db.ObjectId
+  transactionId String                @db.ObjectId
+  transaction   AccountingTransaction @relation(fields: [transactionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accountId     String                @db.ObjectId
+  account       ChartOfAccount        @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  entryType     EntryType
+  amount        Float
+  description   String?
+  createdAt     DateTime              @default(now())
 }
 
 // ─── Bank & Cash Accounts ─────────────────────────────────────────────────────
 
 model BankAccount {
-  id              String      @id @default(auto()) @map("_id") @db.ObjectId
-  name            String                          // e.g. "SBI Main A/C", "Cash in Hand"
-  accountNumber   String?     @unique
-  bankName        String?
-  branchName      String?
-  ifscCode        String?
-  accountType     AccountType @default(SAVINGS)
-  openingBalance  Float       @default(0)
-  isActive        Boolean     @default(true)
-  notes           String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String      @id @default(auto()) @map("_id") @db.ObjectId
+  name           String // e.g. "SBI Main A/C", "Cash in Hand"
+  accountNumber  String?     @unique
+  bankName       String?
+  branchName     String?
+  ifscCode       String?
+  accountType    AccountType @default(SAVINGS)
+  openingBalance Float       @default(0)
+  isActive       Boolean     @default(true)
+  notes          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
-  ledgerEntries      LedgerEntry[]
-  donations          Donation[]
-  expenses           Expense[]
-  transfersFrom      FundTransfer[]    @relation("TransferFrom")
-  transfersTo        FundTransfer[]    @relation("TransferTo")
-  collections        MemberCollection[]
-  reconciliations    BankReconciliation[]
+  coaId String?         @unique @db.ObjectId
+  coa   ChartOfAccount? @relation(fields: [coaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  ledgerEntries   LedgerEntry[]
+  donations       Donation[]
+  expenses        Expense[]
+  transfersFrom   FundTransfer[]       @relation("TransferFrom")
+  transfersTo     FundTransfer[]       @relation("TransferTo")
+  collections     MemberCollection[]
+  reconciliations BankReconciliation[]
 }
 
 // ─── Fund Transfer between accounts ──────────────────────────────────────────
 
 model FundTransfer {
-  id              String      @id @default(auto()) @map("_id") @db.ObjectId
-  fromAccountId   String      @db.ObjectId
-  toAccountId     String      @db.ObjectId
-  amount          Float
-  transferDate    DateTime    @default(now())
-  referenceNo     String?
-  notes           String?
-  createdAt       DateTime    @default(now())
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  fromAccountId String   @db.ObjectId
+  toAccountId   String   @db.ObjectId
+  amount        Float
+  transferDate  DateTime @default(now())
+  referenceNo   String?
+  notes         String?
+  createdAt     DateTime @default(now())
 
-  fromAccount     BankAccount @relation("TransferFrom", fields: [fromAccountId], references: [id])
-  toAccount       BankAccount @relation("TransferTo", fields: [toAccountId], references: [id])
+  fromAccount BankAccount @relation("TransferFrom", fields: [fromAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  toAccount   BankAccount @relation("TransferTo", fields: [toAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 // ─── Committee Members ────────────────────────────────────────────────────────
 
 model Member {
-  id              String            @id @default(auto()) @map("_id") @db.ObjectId
-  memberId        String            @unique   // e.g. MEM-001
-  name            String
-  designation     MemberDesignation @default(MEMBER)
-  mobile          String?
-  email           String?
-  address         String?
-  photoUrl        String?
-  joiningDate     DateTime          @default(now())
-  status          MemberStatus      @default(ACTIVE)
-  canCollect      Boolean           @default(false)  // Whether this member is authorized to collect funds
-  notes           String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id          String            @id @default(auto()) @map("_id") @db.ObjectId
+  memberId    String            @unique // e.g. MEM-001
+  name        String
+  designation MemberDesignation @default(MEMBER)
+  mobile      String?
+  email       String?
+  address     String?
+  photoUrl    String?
+  joiningDate DateTime          @default(now())
+  status      MemberStatus      @default(ACTIVE)
+  canCollect  Boolean           @default(false) // Whether this member is authorized to collect funds
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
-  userId          String?           @unique @db.ObjectId
-  user            User?             @relation(fields: [userId], references: [id])
+  userId String? @unique @db.ObjectId
+  user   User?   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  collections     MemberCollection[]
-  donations       Donation[]         @relation("CollectedByMember")
+  collections MemberCollection[]
+  donations   Donation[]         @relation("CollectedByMember")
 }
 
 // ─── Donations ────────────────────────────────────────────────────────────────
 
 model Donation {
-  id                  String           @id @default(auto()) @map("_id") @db.ObjectId
-  donorName           String
-  mobileNumber        String?
-  address             String?
-  category            DonationCategory @default(GENERAL)
-  amount              Float
-  paymentMode         PaymentMode      @default(CASH)
-  transactionId       String?          // UPI/NEFT/RTGS ref number
-  chequeNumber        String?
-  chequeDate          DateTime?
-  bankNameCheque      String?          // Bank name on cheque
-  receiptNo           String           @unique
-  date                DateTime         @default(now())
-  notes               String?
+  id             String           @id @default(auto()) @map("_id") @db.ObjectId
+  donorName      String
+  mobileNumber   String?
+  address        String?
+  category       DonationCategory @default(GENERAL)
+  amount         Float
+  paymentMode    PaymentMode      @default(CASH)
+  transactionId  String? // UPI/NEFT/RTGS ref number
+  chequeNumber   String?
+  chequeDate     DateTime?
+  bankNameCheque String? // Bank name on cheque
+  receiptNo      String           @unique
+  date           DateTime         @default(now())
+  notes          String?
 
   // Which account this donation was credited to
-  accountId           String?          @db.ObjectId
-  account             BankAccount?     @relation(fields: [accountId], references: [id])
+  accountId String?      @db.ObjectId
+  account   BankAccount? @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   // Collected by which member (field collection)
-  collectedByMemberId String?          @db.ObjectId
-  collectedByMember   Member?          @relation("CollectedByMember", fields: [collectedByMemberId], references: [id])
+  collectedByMemberId String? @db.ObjectId
+  collectedByMember   Member? @relation("CollectedByMember", fields: [collectedByMemberId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  receipt             Receipt?
-  memberCollection    MemberCollection?
+  receipt          Receipt?
+  memberCollection MemberCollection?
 }
 
 // ─── Member Collections ───────────────────────────────────────────────────────
 
 model MemberCollection {
-  id                  String           @id @default(auto()) @map("_id") @db.ObjectId
-  memberId            String           @db.ObjectId
-  donationId          String           @unique @db.ObjectId
-  collectedAmount     Float
-  collectedDate       DateTime         @default(now())
-  status              CollectionStatus @default(COLLECTED)
+  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  memberId        String           @db.ObjectId
+  donationId      String           @unique @db.ObjectId
+  collectedAmount Float
+  collectedDate   DateTime         @default(now())
+  status          CollectionStatus @default(COLLECTED)
 
   // Deposit details
-  depositedToAccountId String?         @db.ObjectId
-  depositedDate       DateTime?
-  depositSlipNo       String?
+  depositedToAccountId String?   @db.ObjectId
+  depositedDate        DateTime?
+  depositSlipNo        String?
 
   // Verification
-  verifiedById        String?          @db.ObjectId
-  verifiedAt          DateTime?
-  discrepancyNote     String?
-  verifiedAmount      Float?
+  verifiedById    String?   @db.ObjectId
+  verifiedAt      DateTime?
+  discrepancyNote String?
+  verifiedAmount  Float?
 
-  notes               String?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  member              Member           @relation(fields: [memberId], references: [id])
-  donation            Donation         @relation(fields: [donationId], references: [id])
-  depositedToAccount  BankAccount?     @relation(fields: [depositedToAccountId], references: [id])
-  verifiedBy          User?            @relation("VerifiedCollections", fields: [verifiedById], references: [id])
+  member             Member       @relation(fields: [memberId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  donation           Donation     @relation(fields: [donationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  depositedToAccount BankAccount? @relation(fields: [depositedToAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  verifiedBy         User?        @relation("VerifiedCollections", fields: [verifiedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 // ─── Expenses ─────────────────────────────────────────────────────────────────
 
 model Expense {
-  id              String          @id @default(auto()) @map("_id") @db.ObjectId
-  title           String
-  category        ExpenseCategory @default(MISC)
-  amount          Float
-  vendorName      String?
-  vendorMobile    String?
-  paymentMode     PaymentMode     @default(CASH)
-  chequeNumber    String?
-  chequeDate      DateTime?
-  transactionId   String?
-  billNumber      String?
-  billDate        DateTime?
-  expenseDate     DateTime        @default(now())
-  status          ExpenseStatus   @default(PENDING)
-  attachmentUrl   String?
-  notes           String?
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  category      ExpenseCategory @default(MISC)
+  amount        Float
+  vendorName    String?
+  vendorMobile  String?
+  paymentMode   PaymentMode     @default(CASH)
+  chequeNumber  String?
+  chequeDate    DateTime?
+  transactionId String?
+  billNumber    String?
+  billDate      DateTime?
+  expenseDate   DateTime        @default(now())
+  status        ExpenseStatus   @default(PENDING)
+  attachmentUrl String?
+  notes         String?
 
   // Paid from which account
-  accountId       String?         @db.ObjectId
-  account         BankAccount?    @relation(fields: [accountId], references: [id])
+  accountId String?      @db.ObjectId
+  account   BankAccount? @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  approvedById    String?         @db.ObjectId
-  approvedAt      DateTime?
-  approvedBy      User?           @relation("ApprovedExpenses", fields: [approvedById], references: [id])
+  approvedById String?   @db.ObjectId
+  approvedAt   DateTime?
+  approvedBy   User?     @relation("ApprovedExpenses", fields: [approvedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 
 model Event {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  name            String
-  eventType       String    @default("PUJA")  // PUJA, FESTIVAL, MEETING, OTHER
-  date            DateTime
-  endDate         DateTime?
-  budget          Float?
-  actualExpense   Float?
-  organizer       String?
-  sponsorDetails  String?
-  notes           String?
-  status          String    @default("UPCOMING")  // UPCOMING, ONGOING, COMPLETED
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  eventType      String    @default("PUJA") // PUJA, FESTIVAL, MEETING, OTHER
+  date           DateTime
+  endDate        DateTime?
+  budget         Float?
+  actualExpense  Float?
+  organizer      String?
+  sponsorDetails String?
+  notes          String?
+  status         String    @default("UPCOMING") // UPCOMING, ONGOING, COMPLETED
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 // ─── Ledger ───────────────────────────────────────────────────────────────────
 
 model LedgerEntry {
-  id              String                @id @default(auto()) @map("_id") @db.ObjectId
-  date            DateTime              @default(now())
-  type            LedgerTransactionType @default(INCOME)
-  amount          Float
-  description     String
-  referenceType   String?               // "DONATION", "EXPENSE", "TRANSFER", "MEMBER_DEPOSIT"
-  referenceId     String?
-  
-  accountId       String                @db.ObjectId
-  account         BankAccount           @relation(fields: [accountId], references: [id])
+  id            String                @id @default(auto()) @map("_id") @db.ObjectId
+  date          DateTime              @default(now())
+  type          LedgerTransactionType @default(INCOME)
+  amount        Float
+  description   String
+  referenceType String? // "DONATION", "EXPENSE", "TRANSFER", "MEMBER_DEPOSIT"
+  referenceId   String?
 
-  runningBalance  Float?
-  isReconciled    Boolean               @default(false)
-  reconciledAt    DateTime?
+  accountId String      @db.ObjectId
+  account   BankAccount @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  runningBalance Float?
+  isReconciled   Boolean   @default(false)
+  reconciledAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ─── Bank Reconciliation ──────────────────────────────────────────────────────
 
 model BankReconciliation {
-  id                  String               @id @default(auto()) @map("_id") @db.ObjectId
-  accountId           String               @db.ObjectId
-  statementFromDate   DateTime
-  statementToDate     DateTime
-  openingBalanceBook  Float
-  closingBalanceBook  Float
-  openingBalanceBank  Float
-  closingBalanceBank  Float
-  difference          Float
-  status              ReconciliationStatus @default(DRAFT)
-  notes               String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id                 String               @id @default(auto()) @map("_id") @db.ObjectId
+  accountId          String               @db.ObjectId
+  statementFromDate  DateTime
+  statementToDate    DateTime
+  openingBalanceBook Float
+  closingBalanceBook Float
+  openingBalanceBank Float
+  closingBalanceBank Float
+  difference         Float
+  status             ReconciliationStatus @default(DRAFT)
+  notes              String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
 
-  reconciledById      String?              @db.ObjectId
-  reconciledAt        DateTime?
+  reconciledById String?   @db.ObjectId
+  reconciledAt   DateTime?
 
-  account             BankAccount          @relation(fields: [accountId], references: [id])
-  reconciledBy        User?                @relation("ReconciledBy", fields: [reconciledById], references: [id])
-  items               BankReconciliationItem[]
+  account      BankAccount              @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reconciledBy User?                    @relation("ReconciledBy", fields: [reconciledById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  items        BankReconciliationItem[]
 }
 
 model BankReconciliationItem {
-  id                  String             @id @default(auto()) @map("_id") @db.ObjectId
-  reconciliationId    String             @db.ObjectId
-  ledgerEntryId       String?            @db.ObjectId
-  statementDate       DateTime
-  statementAmount     Float
+  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+  reconciliationId     String    @db.ObjectId
+  ledgerEntryId        String?   @db.ObjectId
+  statementDate        DateTime
+  statementAmount      Float
   statementDescription String?
-  isMatched           Boolean            @default(false)
-  matchedAt           DateTime?
+  isMatched            Boolean   @default(false)
+  matchedAt            DateTime?
 
-  reconciliation      BankReconciliation @relation(fields: [reconciliationId], references: [id])
+  reconciliation BankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 // ─── Receipt ──────────────────────────────────────────────────────────────────
 
 model Receipt {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  receiptNo       String    @unique
-  donationId      String    @unique @db.ObjectId
-  donation        Donation  @relation(fields: [donationId], references: [id])
-  pdfUrl          String?
-  generatedAt     DateTime  @default(now())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  receiptNo   String   @unique
+  donationId  String   @unique @db.ObjectId
+  donation    Donation @relation(fields: [donationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pdfUrl      String?
+  generatedAt DateTime @default(now())
 }
 
 // ─── Audit Log ────────────────────────────────────────────────────────────────
 
 model AuditLog {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  action          String
-  entity          String
-  entityId        String?
-  userId          String?   @db.ObjectId
-  details         String?
-  ipAddress       String?
-  createdAt       DateTime  @default(now())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  action    String
+  entity    String
+  entityId  String?
+  userId    String?  @db.ObjectId
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
 }

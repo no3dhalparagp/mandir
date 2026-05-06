@@ -4,6 +4,22 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
+async function recalculateBalancesForAccount(accountId: string) {
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { accountId },
+    orderBy: { date: "asc" },
+  })
+  let balance = 0
+  for (const entry of entries) {
+    const isDebit = ["EXPENSE", "TRANSFER_OUT"].includes(entry.type)
+    balance = isDebit ? balance - entry.amount : balance + entry.amount
+    await prisma.ledgerEntry.update({
+      where: { id: entry.id },
+      data: { runningBalance: balance },
+    })
+  }
+}
+
 const transferSchema = z.object({
   fromAccountId: z.string().min(1),
   toAccountId: z.string().min(1),
@@ -21,7 +37,6 @@ export async function createFundTransfer(data: z.infer<typeof transferSchema>) {
 
     const transfer = await prisma.fundTransfer.create({ data: validated })
 
-    // Create two ledger entries: debit from source, credit to target
     await prisma.ledgerEntry.createMany({
       data: [
         {
@@ -42,6 +57,9 @@ export async function createFundTransfer(data: z.infer<typeof transferSchema>) {
         },
       ],
     })
+
+    await recalculateBalancesForAccount(validated.fromAccountId)
+    await recalculateBalancesForAccount(validated.toAccountId)
 
     revalidatePath("/dashboard/bank/transfers")
     revalidatePath("/dashboard/ledger")

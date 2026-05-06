@@ -15,7 +15,7 @@ export default async function MemberLedgerPage({
   const member = await prisma.member.findUnique({ where: { id } })
   if (!member) notFound()
 
-  const { collections, totalCollected, totalVerified, outstanding } = await getMemberLedger(id)
+  const { collections, totalCollected, totalDeposited, totalVerified, pendingDeposit, pendingVerification, outstanding } = await getMemberLedger(id)
 
   return (
     <div className="flex flex-col gap-6">
@@ -24,17 +24,29 @@ export default async function MemberLedgerPage({
         <p className="text-muted-foreground">{member.memberId} · {member.designation}</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Collected</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold">₹{totalCollected.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p></CardContent>
         </Card>
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pending Deposit</CardTitle></CardHeader>
+          <CardContent><p className="text-2xl font-bold text-amber-600">₹{pendingDeposit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p></CardContent>
+        </Card>
+        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Pending Verification</CardTitle></CardHeader>
+          <CardContent><p className="text-2xl font-bold text-blue-600">₹{pendingVerification.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p></CardContent>
+        </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Verified &amp; Deposited</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Deposited</CardTitle></CardHeader>
+          <CardContent><p className="text-2xl font-bold">₹{totalDeposited.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Verified</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold text-green-600">₹{totalVerified.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p></CardContent>
         </Card>
         <Card className={outstanding > 0 ? "border-amber-300 bg-amber-50 dark:bg-amber-950/20" : ""}>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Available Balance (Cash with Member)</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Available Balance (Cash)</CardTitle></CardHeader>
           <CardContent><p className={`text-2xl font-bold ${outstanding > 0 ? "text-amber-600" : "text-green-600"}`}>₹{outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p></CardContent>
         </Card>
       </div>

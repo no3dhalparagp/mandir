@@ -5,6 +5,22 @@ import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
 import { getAccountBalance } from "@/app/dashboard/bank/actions"
 
+async function recalculateBalancesForAccount(accountId: string) {
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { accountId },
+    orderBy: { date: "asc" },
+  })
+  let balance = 0
+  for (const entry of entries) {
+    const isDebit = ["EXPENSE", "TRANSFER_OUT"].includes(entry.type)
+    balance = isDebit ? balance - entry.amount : balance + entry.amount
+    await prisma.ledgerEntry.update({
+      where: { id: entry.id },
+      data: { runningBalance: balance },
+    })
+  }
+}
+
 export async function getPendingCollections() {
   return prisma.memberCollection.findMany({
     where: { status: { in: ["COLLECTED", "DEPOSITED"] } },
@@ -58,12 +74,21 @@ export async function getMemberLedger(memberId: string) {
   })
 
   const totalCollected = collections.reduce((s, c) => s + c.collectedAmount, 0)
+  const totalDeposited = collections
+    .filter((c) => c.status === "DEPOSITED" || c.status === "VERIFIED" || c.status === "DISCREPANT")
+    .reduce((s, c) => s + (c.verifiedAmount ?? c.collectedAmount), 0)
   const totalVerified = collections
     .filter((c) => c.status === "VERIFIED")
     .reduce((s, c) => s + (c.verifiedAmount ?? c.collectedAmount), 0)
+  const pendingDeposit = collections
+    .filter((c) => c.status === "COLLECTED")
+    .reduce((s, c) => s + c.collectedAmount, 0)
+  const pendingVerification = collections
+    .filter((c) => c.status === "DEPOSITED")
+    .reduce((s, c) => s + c.collectedAmount, 0)
   const outstanding = totalCollected - totalVerified
 
-  return { collections, totalCollected, totalVerified, outstanding }
+  return { collections, totalCollected, totalDeposited, totalVerified, pendingDeposit, pendingVerification, outstanding }
 }
 
 export async function markCollectionDeposited(
@@ -113,14 +138,10 @@ export async function verifyCollection(
       },
     })
 
-    // Determine which account to credit:
-    // 1. Use the explicit depositedToAccountId (member handed cash to accountant and chose an account)
-    // 2. Fall back to the donation's own accountId (direct donation linked to an account)
     const targetAccountId = collection.depositedToAccountId ?? collection.donation.accountId
     const targetAccountName = collection.depositedToAccount?.name ?? collection.donation.account?.name
 
     if (!hasDiscrepancy && targetAccountId) {
-      // Avoid duplicate ledger entries if one was already created at donation time
       const existingEntry = await prisma.ledgerEntry.findFirst({
         where: { referenceType: "MEMBER_COLLECTION", referenceId: collectionId },
       })
@@ -135,6 +156,8 @@ export async function verifyCollection(
             referenceId: collectionId,
           },
         })
+
+        await recalculateBalancesForAccount(targetAccountId)
       }
     }
 

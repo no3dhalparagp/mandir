@@ -5,6 +5,22 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { DonationCategory, PaymentMode } from "@prisma/client"
 
+async function recalculateBalancesForAccount(accountId: string) {
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { accountId },
+    orderBy: { date: "asc" },
+  })
+  let balance = 0
+  for (const entry of entries) {
+    const isDebit = ["EXPENSE", "TRANSFER_OUT"].includes(entry.type)
+    balance = isDebit ? balance - entry.amount : balance + entry.amount
+    await prisma.ledgerEntry.update({
+      where: { id: entry.id },
+      data: { runningBalance: balance },
+    })
+  }
+}
+
 const donationSchema = z.object({
   donorName: z.string().min(2, "Name must be at least 2 characters."),
   mobileNumber: z.string().optional(),
@@ -28,7 +44,6 @@ export async function createDonation(data: z.infer<typeof donationSchema>) {
   try {
     const validatedData = donationSchema.parse(data)
 
-    // Generate a receipt number: RCPT-YYYYMMDD-RANDOM
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "")
     const randomStr = Math.floor(1000 + Math.random() * 9000)
     const receiptNo = `RCPT-${dateStr}-${randomStr}`
@@ -52,7 +67,6 @@ export async function createDonation(data: z.infer<typeof donationSchema>) {
       },
     })
 
-    // If collected by a member, create a MemberCollection entry
     if (validatedData.collectedByMemberId) {
       await prisma.memberCollection.create({
         data: {
@@ -63,7 +77,6 @@ export async function createDonation(data: z.infer<typeof donationSchema>) {
       })
     }
 
-    // If payment goes directly to an account (not via member), create ledger entry
     if (validatedData.accountId && !validatedData.collectedByMemberId) {
       await prisma.ledgerEntry.create({
         data: {
@@ -75,6 +88,8 @@ export async function createDonation(data: z.infer<typeof donationSchema>) {
           referenceId: donation.id,
         },
       })
+
+      await recalculateBalancesForAccount(validatedData.accountId)
     }
 
     revalidatePath("/dashboard/donations")

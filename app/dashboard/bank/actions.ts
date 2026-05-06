@@ -16,6 +16,23 @@ const bankAccountSchema = z.object({
   notes: z.string().optional(),
 })
 
+async function recalculateRunningBalances(accountId: string) {
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { accountId },
+    orderBy: { date: "asc" },
+  })
+
+  let balance = 0
+  for (const entry of entries) {
+    const isDebit = ["EXPENSE", "TRANSFER_OUT"].includes(entry.type)
+    balance = isDebit ? balance - entry.amount : balance + entry.amount
+    await prisma.ledgerEntry.update({
+      where: { id: entry.id },
+      data: { runningBalance: balance },
+    })
+  }
+}
+
 export async function getBankAccounts() {
   return prisma.bankAccount.findMany({
     orderBy: { createdAt: "asc" },
@@ -26,12 +43,13 @@ export async function getBankAccounts() {
 }
 
 export async function getBankAccountById(id: string) {
-  return prisma.bankAccount.findUnique({
+  const account = await prisma.bankAccount.findUnique({
     where: { id },
     include: {
       ledgerEntries: { orderBy: { date: "desc" }, take: 50 },
     },
   })
+  return account
 }
 
 export async function createBankAccount(data: z.infer<typeof bankAccountSchema>) {
@@ -39,7 +57,6 @@ export async function createBankAccount(data: z.infer<typeof bankAccountSchema>)
     const validated = bankAccountSchema.parse(data)
     const account = await prisma.bankAccount.create({ data: validated })
 
-    // Seed an opening balance ledger entry
     if (validated.openingBalance > 0) {
       await prisma.ledgerEntry.create({
         data: {
@@ -64,9 +81,16 @@ export async function createBankAccount(data: z.infer<typeof bankAccountSchema>)
 export async function getAccountBalance(accountId: string) {
   const entries = await prisma.ledgerEntry.findMany({
     where: { accountId },
+    orderBy: { date: "asc" },
   })
   return entries.reduce((sum, e) => {
     const isDebit = ["EXPENSE", "TRANSFER_OUT"].includes(e.type)
     return isDebit ? sum - e.amount : sum + e.amount
   }, 0)
+}
+
+export async function recalculateBalances(accountId: string) {
+  await recalculateRunningBalances(accountId)
+  revalidatePath("/dashboard/bank")
+  return { success: true }
 }
