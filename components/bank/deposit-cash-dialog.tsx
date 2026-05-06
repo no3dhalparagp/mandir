@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+
 import {
   Select,
   SelectContent,
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+
 import {
   Dialog,
   DialogContent,
@@ -35,7 +37,7 @@ const schema = z.object({
   notes: z.string().optional(),
 })
 
-// IMPORTANT FIX
+// IMPORTANT: use z.input for react-hook-form
 type FormData = z.input<typeof schema>
 
 interface Account {
@@ -72,11 +74,12 @@ export function DepositCashDialog({
     },
   })
 
-  // Filter accounts
+  // Cash accounts
   const cashAccounts = accounts.filter(
     (a) => a.accountType === "CASH_IN_HAND"
   )
 
+  // Bank accounts
   const bankAccounts = accounts.filter(
     (a) => a.accountType !== "CASH_IN_HAND"
   )
@@ -84,7 +87,7 @@ export function DepositCashDialog({
   const cannotSubmit =
     cashAccounts.length === 0 || bankAccounts.length === 0
 
-  function onSubmit(data: FormData) {
+  const onSubmit = async (data: FormData) => {
     startTransition(async () => {
       try {
         const res = await createFundTransfer({
@@ -128,7 +131,9 @@ export function DepositCashDialog({
 
       <DialogContent className="sm:max-w-[420px]">
         <DialogHeader>
-          <DialogTitle>Deposit Cash to Bank</DialogTitle>
+          <DialogTitle>
+            Deposit Cash to Bank
+          </DialogTitle>
         </DialogHeader>
 
         <form
@@ -140,7 +145,7 @@ export function DepositCashDialog({
             <Label>From Cash Account *</Label>
 
             <Select
-              onValueChange={(v) =>
+              onValueChange={(v: string) =>
                 setValue("fromAccountId", v)
               }
             >
@@ -155,7 +160,10 @@ export function DepositCashDialog({
                   </SelectItem>
                 ) : (
                   cashAccounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
+                    <SelectItem
+                      key={a.id}
+                      value={a.id}
+                    >
                       {a.name} (
                       Bal: ₹
                       {a.currentBalance?.toLocaleString(
@@ -180,7 +188,7 @@ export function DepositCashDialog({
             <Label>Deposit To Bank Account *</Label>
 
             <Select
-              onValueChange={(v) =>
+              onValueChange={(v: string) =>
                 setValue("toAccountId", v)
               }
             >
@@ -195,7 +203,10 @@ export function DepositCashDialog({
                   </SelectItem>
                 ) : (
                   bankAccounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
+                    <SelectItem
+                      key={a.id}
+                      value={a.id}
+                    >
                       {a.name} (
                       Bal: ₹
                       {a.currentBalance?.toLocaleString(
@@ -233,9 +244,11 @@ export function DepositCashDialog({
             )}
           </div>
 
-          {/* Reference */}
+          {/* Reference No */}
           <div className="space-y-2">
-            <Label>Deposit Slip / Ref No.</Label>
+            <Label>
+              Deposit Slip / Reference No.
+            </Label>
 
             <Input
               placeholder="Optional"
@@ -253,7 +266,7 @@ export function DepositCashDialog({
             />
           </div>
 
-          {/* Submit */}
+          {/* Submit Button */}
           <Button
             type="submit"
             className="w-full"
