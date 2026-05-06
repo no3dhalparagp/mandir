@@ -34,7 +34,7 @@ export function AddJournalEntryDialog({ accounts }: { accounts: { id: string; na
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema) as any,
+    resolver: zodResolver(schema),
     defaultValues: {
       date: new Date()
     }

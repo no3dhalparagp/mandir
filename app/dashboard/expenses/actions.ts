@@ -121,8 +121,9 @@ export async function approveExpense(id: string) {
     revalidatePath("/dashboard/expenses")
     revalidatePath("/dashboard")
     return { success: true }
-  } catch (error: any) {
-    return { error: error.message || "Failed to approve expense." }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to approve expense."
+    return { error: message }
   }
 }
 

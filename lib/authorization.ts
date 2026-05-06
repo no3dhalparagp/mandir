@@ -47,19 +47,22 @@ export async function checkMinRole(minRole: RoleType) {
 
 
 
-export async function hasPermission(module: keyof typeof PERMISSIONS, action: string) {
+type PermissionModule = keyof typeof PERMISSIONS
+type PermissionAction = string
+
+export async function hasPermission(module: PermissionModule, action: PermissionAction) {
   const user = await getCurrentUser()
   if (!user) return false
-  const modulePerms = PERMISSIONS[module] as any
-  const allowedRoles = modulePerms?.[action]
+  const modulePerms = PERMISSIONS[module]
+  const allowedRoles = modulePerms[action as keyof typeof modulePerms]
   if (!allowedRoles) return false
   return hasRole(user.role, allowedRoles)
 }
 
-export async function requirePermission(module: keyof typeof PERMISSIONS, action: string) {
+export async function requirePermission(module: PermissionModule, action: PermissionAction) {
   const user = await requireAuth()
-  const modulePerms = PERMISSIONS[module] as any
-  const allowedRoles = modulePerms?.[action]
+  const modulePerms = PERMISSIONS[module]
+  const allowedRoles = modulePerms[action as keyof typeof modulePerms]
   if (!allowedRoles || !hasRole(user.role, allowedRoles)) {
     throw new Error("Insufficient permissions")
   }

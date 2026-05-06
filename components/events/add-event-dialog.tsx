@@ -30,7 +30,7 @@ export function AddEventDialog() {
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
   const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema) as any,
+    resolver: zodResolver(schema),
     defaultValues: { eventType: "PUJA" },
   })
 
@@ -58,7 +58,7 @@ export function AddEventDialog() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Type</Label>
-              <Select onValueChange={(v) => setValue("eventType", v as any)} defaultValue="PUJA">
+              <Select onValueChange={(v) => setValue("eventType", v as "PUJA" | "FESTIVAL" | "MEETING" | "OTHER")} defaultValue="PUJA">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="PUJA">Puja</SelectItem>

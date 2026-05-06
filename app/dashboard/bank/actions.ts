@@ -76,9 +76,10 @@ export async function createBankAccount(data: z.infer<typeof bankAccountSchema>)
 
     revalidatePath("/dashboard/bank")
     return { success: true, data: account }
-  } catch (error: any) {
+  } catch (error) {
     console.error(error)
-    return { error: error.message || "Failed to create bank account." }
+    const message = error instanceof Error ? error.message : "Failed to create bank account."
+    return { error: message }
   }
 }
 

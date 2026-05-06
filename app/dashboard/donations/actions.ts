@@ -98,9 +98,10 @@ export async function createDonation(data: z.infer<typeof donationSchema>) {
     revalidatePath("/dashboard/bank")
     revalidatePath("/dashboard")
     return { success: true, data: donation }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Donation creation failed:", error)
-    return { error: error.message || "Failed to create donation." }
+    const message = error instanceof Error ? error.message : "Failed to create donation."
+    return { error: message }
   }
 }
 

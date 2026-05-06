@@ -19,16 +19,16 @@ export function useRequireAuth() {
 
 export function useRequireRole(requiredRoles: RoleType | RoleType[]) {
   const { session, status } = useRequireAuth()
-  const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles]
 
   useEffect(() => {
     if (status === "authenticated" && session?.user?.role) {
+      const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles]
       const hasAccess = hasRole(session.user.role, roles)
       if (!hasAccess) {
         redirect("/dashboard")
       }
     }
-  }, [status, session, roles])
+  }, [status, session, requiredRoles])
 
   return { session, status }
 }

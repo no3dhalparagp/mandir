@@ -52,7 +52,7 @@ export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId
   const {
     register, handleSubmit, setValue, formState: { errors },
   } = useForm<DonationFormData>({
-    resolver: zodResolver(donationSchema) as any,
+    resolver: zodResolver(donationSchema),
     defaultValues: { 
       category: "GENERAL", 
       paymentMode: "CASH",
@@ -62,7 +62,7 @@ export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId
 
   function onSubmit(data: DonationFormData) {
     startTransition(async () => {
-      const result = await createDonation(data as any)
+      const result = await createDonation(data)
       if (result.error) toast.error(result.error)
       else { toast.success("Donation added successfully!"); onSuccess() }
     })

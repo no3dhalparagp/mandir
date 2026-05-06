@@ -84,9 +84,10 @@ export async function createJournalEntry(data: z.infer<typeof journalSchema>) {
 
     revalidatePath("/dashboard/journal")
     return { success: true }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Journal Error:", error)
-    return { error: error.message || "Failed to create journal entry." }
+    const message = error instanceof Error ? error.message : "Failed to create journal entry."
+    return { error: message }
   }
 }
 

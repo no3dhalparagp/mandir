@@ -1,13 +1,12 @@
-import React from "react"
+import React from "react";
 import {
   Document,
   Page,
   Text,
   View,
   StyleSheet,
-  Font,
   Image,
-} from "@react-pdf/renderer"
+} from "@react-pdf/renderer";
 
 // Register standard fonts or custom fonts for Bengali if needed
 // Font.register({ family: 'NotoSansBengali', src: '/fonts/NotoSansBengali-Regular.ttf' });
@@ -114,16 +113,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingTop: 5,
   },
-})
+});
 
 interface ReceiptData {
-  receiptNo: string
-  date: string
-  donorName: string
-  amount: number
-  category: string
-  paymentMode: string
-  qrCodeDataUrl?: string
+  receiptNo: string;
+  date: string;
+  donorName: string;
+  amount: number;
+  category: string;
+  paymentMode: string;
+  qrCodeDataUrl?: string;
 }
 
 export function ReceiptDocument({ data }: { data: ReceiptData }) {
@@ -133,12 +132,10 @@ export function ReceiptDocument({ data }: { data: ReceiptData }) {
         <View style={styles.header}>
           <View>
             <Text style={styles.headerTitle}>SHREE MANDIR</Text>
-            <Text style={styles.headerSubtitle}>
-              Official Donation Receipt
-            </Text>
+            <Text style={styles.headerSubtitle}>Official Donation Receipt</Text>
           </View>
           {data.qrCodeDataUrl && (
-            <Image src={data.qrCodeDataUrl} style={{ width: 50, height: 50 }} />
+            <Image src={data.qrCodeDataUrl} style={{ width: 50, height: 50 }} alt="QR Code" />
           )}
         </View>
 
@@ -155,7 +152,9 @@ export function ReceiptDocument({ data }: { data: ReceiptData }) {
 
         <View>
           <Text style={styles.label}>Received with thanks from:</Text>
-          <Text style={{ ...styles.value, fontSize: 16 }}>{data.donorName}</Text>
+          <Text style={{ ...styles.value, fontSize: 16 }}>
+            {data.donorName}
+          </Text>
         </View>
 
         <View style={styles.table}>
@@ -192,9 +191,10 @@ export function ReceiptDocument({ data }: { data: ReceiptData }) {
         </View>
 
         <Text style={styles.footer}>
-          This is a computer generated receipt and does not require a physical signature.
+          This is a computer generated receipt and does not require a physical
+          signature.
         </Text>
       </Page>
     </Document>
-  )
+  );
 }

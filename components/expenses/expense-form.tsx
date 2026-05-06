@@ -40,13 +40,13 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
   const [paymentMode, setPaymentMode] = React.useState("CASH")
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<ExpenseFormData>({
-    resolver: zodResolver(expenseSchema) as any,
+    resolver: zodResolver(expenseSchema),
     defaultValues: { category: "MISC", paymentMode: "CASH" },
   })
 
   function onSubmit(data: ExpenseFormData) {
     startTransition(async () => {
-      const result = await createExpense(data as any)
+      const result = await createExpense(data)
       if (result.error) toast.error(result.error)
       else { toast.success("Expense recorded!"); onSuccess() }
     })

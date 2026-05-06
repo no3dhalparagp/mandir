@@ -56,11 +56,14 @@ export default async function CashBookReportPage({
   // Let's assume priorBalanceEffect is the correct opening balance for the period.
   const openingBalance = priorBalanceEffect
 
-  let runningBal = openingBalance
-  const reportRows = entries.map(e => {
+  const reportRows = entries.map((e, index) => {
     const isDebit = ["EXPENSE", "TRANSFER_OUT"].includes(e.type)
-    if (isDebit) runningBal -= e.amount
-    else runningBal += e.amount
+    let runningBal = openingBalance
+    for (let i = 0; i <= index; i++) {
+      const entry = entries[i]
+      const entryDebit = ["EXPENSE", "TRANSFER_OUT"].includes(entry.type)
+      runningBal = entryDebit ? runningBal - entry.amount : runningBal + entry.amount
+    }
     return { ...e, isDebit, balance: runningBal }
   })
 

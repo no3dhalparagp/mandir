@@ -1,4 +1,4 @@
-import { type RoleType } from "@/lib/roles"
+
 
 export const PERMISSIONS = {
   donations: {

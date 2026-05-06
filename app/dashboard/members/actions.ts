@@ -95,7 +95,8 @@ export async function updateMember(id: string, data: Partial<z.infer<typeof memb
     const member = await prisma.member.update({ where: { id }, data })
     revalidatePath("/dashboard/members")
     return { success: true, data: member }
-  } catch (error: any) {
-    return { error: error.message || "Failed to update member." }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update member."
+    return { error: message }
   }
 }

@@ -31,7 +31,7 @@ export function WithdrawCashDialog({
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
   const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema) as any,
+    resolver: zodResolver(schema),
     defaultValues: { fromAccountId: "", toAccountId: "" }
   })
 

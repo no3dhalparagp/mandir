@@ -27,7 +27,7 @@ export function FundTransferDialog({ accounts }: { accounts: { id: string; name:
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
   const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema) as any,
+    resolver: zodResolver(schema),
   })
 
   function onSubmit(data: FormData) {

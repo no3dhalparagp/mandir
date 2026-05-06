@@ -42,7 +42,7 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { cn } from "@/lib/utils"
+
 import type { LucideIcon } from "lucide-react"
 
 type NavItem = {

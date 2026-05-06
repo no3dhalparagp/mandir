@@ -118,7 +118,7 @@ export async function seedDefaultChartOfAccounts() {
       data: {
         code: acc.code,
         name: acc.name,
-        type: acc.type as any,
+        type: acc.type as "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE",
         parentId,
       },
     })
