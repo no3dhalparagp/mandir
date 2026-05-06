@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react"
 import { redirect } from "next/navigation"
 import { useEffect } from "react"
-import type { Role } from "@prisma/client"
+import { hasRole, type RoleType } from "@/lib/roles"
 
 export function useRequireAuth() {
   const { data: session, status } = useSession()
@@ -17,13 +17,13 @@ export function useRequireAuth() {
   return { session, status }
 }
 
-export function useRequireRole(requiredRoles: Role | Role[]) {
+export function useRequireRole(requiredRoles: RoleType | RoleType[]) {
   const { session, status } = useRequireAuth()
   const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles]
 
   useEffect(() => {
     if (status === "authenticated" && session?.user?.role) {
-      const hasAccess = roles.includes(session.user.role as Role)
+      const hasAccess = hasRole(session.user.role, roles)
       if (!hasAccess) {
         redirect("/dashboard")
       }
@@ -33,9 +33,8 @@ export function useRequireRole(requiredRoles: Role | Role[]) {
   return { session, status }
 }
 
-export function useHasRole(requiredRoles: Role | Role[]) {
+export function useHasRole(requiredRoles: RoleType | RoleType[]) {
   const { data: session } = useSession()
   if (!session?.user?.role) return false
-  const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles]
-  return roles.includes(session.user.role as Role)
+  return hasRole(session.user.role, requiredRoles)
 }

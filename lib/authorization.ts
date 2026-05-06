@@ -1,17 +1,8 @@
 "use server"
 
 import { auth } from "@/auth"
-import { Role } from "@prisma/client"
-
-export type RoleType = Role
-
-export const ROLE_HIERARCHY: Record<RoleType, number> = {
-  SUPER_ADMIN: 5,
-  COMMITTEE_ADMIN: 4,
-  ACCOUNTANT: 3,
-  DATA_ENTRY_OPERATOR: 2,
-  VIEWER: 1,
-}
+import { hasRole, hasMinRole, type RoleType } from "@/lib/roles"
+import { PERMISSIONS } from "@/lib/permissions"
 
 export async function getCurrentUser() {
   const session = await auth()
@@ -24,17 +15,6 @@ export async function requireAuth() {
     throw new Error("Authentication required")
   }
   return user
-}
-
-export function hasRole(userRole: string, requiredRoles: RoleType | RoleType[]) {
-  const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles]
-  return roles.includes(userRole as RoleType)
-}
-
-export function hasMinRole(userRole: string, minRole: RoleType) {
-  const userLevel = ROLE_HIERARCHY[userRole as RoleType] || 0
-  const minLevel = ROLE_HIERARCHY[minRole]
-  return userLevel >= minLevel
 }
 
 export async function requireRole(requiredRoles: RoleType | RoleType[]) {
@@ -65,64 +45,7 @@ export async function checkMinRole(minRole: RoleType) {
   return hasMinRole(user.role, minRole)
 }
 
-export const PERMISSIONS = {
-  donations: {
-    create: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR"],
-    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
-    edit: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
-    delete: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-  },
-  expenses: {
-    create: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR"],
-    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
-    approve: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-    edit: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
-    delete: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-  },
-  collections: {
-    create: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR"],
-    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
-    deposit: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR"],
-    verify: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
-  },
-  bank: {
-    create: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
-    edit: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-    transfer: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
-    reconcile: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
-  },
-  journal: {
-    create: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
-    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
-    edit: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
-  },
-  members: {
-    create: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
-    edit: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-    delete: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-  },
-  events: {
-    create: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
-    edit: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-    delete: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-  },
-  reports: {
-    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
-  },
-  users: {
-    create: ["SUPER_ADMIN"],
-    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-    edit: ["SUPER_ADMIN"],
-    delete: ["SUPER_ADMIN"],
-  },
-  settings: {
-    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-    edit: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
-  },
-} as const
+
 
 export async function hasPermission(module: keyof typeof PERMISSIONS, action: string) {
   const user = await getCurrentUser()
