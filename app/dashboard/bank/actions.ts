@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { AccountType } from "@prisma/client"
+import { requirePermission, requireAuth } from "@/lib/authorization"
 
 const bankAccountSchema = z.object({
   name: z.string().min(2, "Account name is required"),
@@ -34,6 +35,7 @@ async function recalculateRunningBalances(accountId: string) {
 }
 
 export async function getBankAccounts() {
+  await requirePermission("bank", "read")
   return prisma.bankAccount.findMany({
     orderBy: { createdAt: "asc" },
     include: {
@@ -43,6 +45,7 @@ export async function getBankAccounts() {
 }
 
 export async function getBankAccountById(id: string) {
+  await requirePermission("bank", "read")
   const account = await prisma.bankAccount.findUnique({
     where: { id },
     include: {
@@ -54,6 +57,7 @@ export async function getBankAccountById(id: string) {
 
 export async function createBankAccount(data: z.infer<typeof bankAccountSchema>) {
   try {
+    await requirePermission("bank", "create")
     const validated = bankAccountSchema.parse(data)
     const account = await prisma.bankAccount.create({ data: validated })
 
@@ -72,9 +76,9 @@ export async function createBankAccount(data: z.infer<typeof bankAccountSchema>)
 
     revalidatePath("/dashboard/bank")
     return { success: true, data: account }
-  } catch (error) {
+  } catch (error: any) {
     console.error(error)
-    return { error: "Failed to create bank account." }
+    return { error: error.message || "Failed to create bank account." }
   }
 }
 

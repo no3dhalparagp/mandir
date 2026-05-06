@@ -7,6 +7,7 @@ import { MemberDesignation, MemberStatus } from "@prisma/client"
 
 import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
+import { requirePermission } from "@/lib/authorization"
 
 const memberSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -30,11 +31,13 @@ const memberSchema = z.object({
 }, { message: "Email, Password, and Role are required to create a login account", path: ["createLogin"] })
 
 export async function getMembers() {
+  await requirePermission("members", "read")
   return prisma.member.findMany({ orderBy: { createdAt: "desc" } })
 }
 
 export async function createMember(data: z.infer<typeof memberSchema>) {
   try {
+    await requirePermission("members", "create")
     const validated = memberSchema.parse(data)
 
     // Auto-generate memberId
@@ -88,10 +91,11 @@ export async function createMember(data: z.infer<typeof memberSchema>) {
 
 export async function updateMember(id: string, data: Partial<z.infer<typeof memberSchema>>) {
   try {
+    await requirePermission("members", "edit")
     const member = await prisma.member.update({ where: { id }, data })
     revalidatePath("/dashboard/members")
     return { success: true, data: member }
-  } catch {
-    return { error: "Failed to update member." }
+  } catch (error: any) {
+    return { error: error.message || "Failed to update member." }
   }
 }

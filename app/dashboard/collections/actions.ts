@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
 import { getAccountBalance } from "@/app/dashboard/bank/actions"
+import { requirePermission, requireAuth, hasPermission } from "@/lib/authorization"
 
 async function recalculateBalancesForAccount(accountId: string) {
   const entries = await prisma.ledgerEntry.findMany({
@@ -22,6 +23,7 @@ async function recalculateBalancesForAccount(accountId: string) {
 }
 
 export async function getPendingCollections() {
+  await requirePermission("collections", "read")
   return prisma.memberCollection.findMany({
     where: { status: { in: ["COLLECTED", "DEPOSITED"] } },
     include: {
@@ -34,6 +36,7 @@ export async function getPendingCollections() {
 }
 
 export async function getAllCollections() {
+  await requirePermission("collections", "read")
   const session = await auth()
   
   let whereClause = {}
@@ -97,6 +100,7 @@ export async function markCollectionDeposited(
   depositSlipNo?: string
 ) {
   try {
+    await requirePermission("collections", "deposit")
     await prisma.memberCollection.update({
       where: { id: collectionId },
       data: {
@@ -108,8 +112,8 @@ export async function markCollectionDeposited(
     })
     revalidatePath("/dashboard/collections")
     return { success: true }
-  } catch {
-    return { error: "Failed to mark as deposited." }
+  } catch (error: any) {
+    return { error: error.message || "Failed to mark as deposited." }
   }
 }
 
@@ -119,7 +123,8 @@ export async function verifyCollection(
   discrepancyNote?: string
 ) {
   try {
-    const session = await auth()
+    await requirePermission("collections", "verify")
+    const user = await requireAuth()
     const collection = await prisma.memberCollection.findUnique({
       where: { id: collectionId },
       include: { donation: { include: { account: true } }, depositedToAccount: true },
@@ -131,7 +136,7 @@ export async function verifyCollection(
       where: { id: collectionId },
       data: {
         status: hasDiscrepancy ? "DISCREPANT" : "VERIFIED",
-        verifiedById: session?.user?.id,
+        verifiedById: user.id,
         verifiedAt: new Date(),
         verifiedAmount,
         discrepancyNote: hasDiscrepancy ? discrepancyNote : null,
@@ -174,7 +179,7 @@ export async function verifyCollection(
       balance: currentBalance, 
       accountName: targetAccountName ?? undefined,
     }
-  } catch {
-    return { error: "Failed to verify collection." }
+  } catch (error: any) {
+    return { error: error.message || "Failed to verify collection." }
   }
 }

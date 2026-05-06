@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { requirePermission } from "@/lib/authorization"
 
 const journalSchema = z.object({
   debitAccountId: z.string().min(1, "Select debit account"),
@@ -15,6 +16,7 @@ const journalSchema = z.object({
 
 export async function createJournalEntry(data: z.infer<typeof journalSchema>) {
   try {
+    await requirePermission("journal", "create")
     const validated = journalSchema.parse(data)
     
     if (validated.debitAccountId === validated.creditAccountId) {
@@ -82,8 +84,17 @@ export async function createJournalEntry(data: z.infer<typeof journalSchema>) {
 
     revalidatePath("/dashboard/journal")
     return { success: true }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Journal Error:", error)
-    return { error: "Failed to create journal entry." }
+    return { error: error.message || "Failed to create journal entry." }
   }
+}
+
+export async function getJournalEntries() {
+  await requirePermission("journal", "read")
+  return prisma.ledgerEntry.findMany({
+    orderBy: { date: "desc" },
+    include: { account: true },
+    take: 100,
+  })
 }

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { ExpenseCategory, PaymentMode } from "@prisma/client"
-import { auth } from "@/auth"
+import { requirePermission, requireAuth, hasPermission } from "@/lib/authorization"
 
 async function recalculateBalancesForAccount(accountId: string) {
   const entries = await prisma.ledgerEntry.findMany({
@@ -39,11 +39,12 @@ const expenseSchema = z.object({
 
 export async function createExpense(data: z.infer<typeof expenseSchema>) {
   try {
+    await requirePermission("expenses", "create")
     const validatedData = expenseSchema.parse(data)
-    const session = await auth()
+    const user = await requireAuth()
 
     const isAutoApproved =
-      session?.user?.role === "SUPER_ADMIN" || session?.user?.role === "COMMITTEE_ADMIN"
+      user.role === "SUPER_ADMIN" || user.role === "COMMITTEE_ADMIN"
 
     const expense = await prisma.expense.create({
       data: {
@@ -60,7 +61,7 @@ export async function createExpense(data: z.infer<typeof expenseSchema>) {
         accountId: validatedData.accountId || undefined,
         notes: validatedData.notes || undefined,
         status: isAutoApproved ? "APPROVED" : "PENDING",
-        approvedById: isAutoApproved ? session?.user?.id : undefined,
+        approvedById: isAutoApproved ? user.id : undefined,
         approvedAt: isAutoApproved ? new Date() : undefined,
       },
     })
@@ -83,20 +84,21 @@ export async function createExpense(data: z.infer<typeof expenseSchema>) {
     revalidatePath("/dashboard/expenses")
     revalidatePath("/dashboard")
     return { success: true, data: expense }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Expense creation failed:", error)
-    return { error: "Failed to create expense." }
+    return { error: error.message || "Failed to create expense." }
   }
 }
 
 export async function approveExpense(id: string) {
   try {
-    const session = await auth()
+    await requirePermission("expenses", "approve")
+    const user = await requireAuth()
     const expense = await prisma.expense.update({
       where: { id },
       data: {
         status: "APPROVED",
-        approvedById: session?.user?.id,
+        approvedById: user.id,
         approvedAt: new Date(),
       },
     })
@@ -119,20 +121,30 @@ export async function approveExpense(id: string) {
     revalidatePath("/dashboard/expenses")
     revalidatePath("/dashboard")
     return { success: true }
-  } catch {
-    return { error: "Failed to approve expense." }
+  } catch (error: any) {
+    return { error: error.message || "Failed to approve expense." }
   }
 }
 
 export async function rejectExpense(id: string) {
   try {
+    await requirePermission("expenses", "approve")
     await prisma.expense.update({
       where: { id },
       data: { status: "REJECTED" },
     })
     revalidatePath("/dashboard/expenses")
     return { success: true }
-  } catch {
-    return { error: "Failed to reject expense." }
+  } catch (error: any) {
+    return { error: error.message || "Failed to reject expense." }
   }
+}
+
+export async function getExpenses() {
+  await requirePermission("expenses", "read")
+  return prisma.expense.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { account: true, approvedBy: { select: { name: true } } },
+    take: 100,
+  })
 }

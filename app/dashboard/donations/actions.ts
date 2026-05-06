@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { DonationCategory, PaymentMode } from "@prisma/client"
+import { requirePermission, requireAuth, hasPermission } from "@/lib/authorization"
 
 async function recalculateBalancesForAccount(accountId: string) {
   const entries = await prisma.ledgerEntry.findMany({
@@ -42,6 +43,7 @@ const donationSchema = z.object({
 
 export async function createDonation(data: z.infer<typeof donationSchema>) {
   try {
+    await requirePermission("donations", "create")
     const validatedData = donationSchema.parse(data)
 
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "")
@@ -96,13 +98,14 @@ export async function createDonation(data: z.infer<typeof donationSchema>) {
     revalidatePath("/dashboard/bank")
     revalidatePath("/dashboard")
     return { success: true, data: donation }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Donation creation failed:", error)
-    return { error: "Failed to create donation." }
+    return { error: error.message || "Failed to create donation." }
   }
 }
 
 export async function getDonationAccounts() {
+  await requirePermission("donations", "read")
   return prisma.bankAccount.findMany({
     where: { isActive: true },
     select: { id: true, name: true, accountType: true },
@@ -111,9 +114,19 @@ export async function getDonationAccounts() {
 }
 
 export async function getCollectorMembers() {
+  await requirePermission("donations", "read")
   return prisma.member.findMany({
     where: { canCollect: true, status: "ACTIVE" },
     select: { id: true, name: true, memberId: true },
     orderBy: { name: "asc" },
+  })
+}
+
+export async function getDonations() {
+  await requirePermission("donations", "read")
+  return prisma.donation.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { account: true, collectedByMember: true },
+    take: 100,
   })
 }
