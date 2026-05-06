@@ -37,7 +37,7 @@ const schema = z.object({
   notes: z.string().optional(),
 })
 
-// IMPORTANT: use z.input for react-hook-form
+// Use input type for RHF
 type FormData = z.input<typeof schema>
 
 interface Account {
@@ -74,12 +74,11 @@ export function DepositCashDialog({
     },
   })
 
-  // Cash accounts
+  // Filter account types
   const cashAccounts = accounts.filter(
     (a) => a.accountType === "CASH_IN_HAND"
   )
 
-  // Bank accounts
   const bankAccounts = accounts.filter(
     (a) => a.accountType !== "CASH_IN_HAND"
   )
@@ -145,9 +144,11 @@ export function DepositCashDialog({
             <Label>From Cash Account *</Label>
 
             <Select
-              onValueChange={(v: string) =>
-                setValue("fromAccountId", v)
-              }
+              onValueChange={(v) => {
+                if (v) {
+                  setValue("fromAccountId", v)
+                }
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select cash account" />
@@ -188,9 +189,11 @@ export function DepositCashDialog({
             <Label>Deposit To Bank Account *</Label>
 
             <Select
-              onValueChange={(v: string) =>
-                setValue("toAccountId", v)
-              }
+              onValueChange={(v) => {
+                if (v) {
+                  setValue("toAccountId", v)
+                }
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select bank account" />
@@ -244,7 +247,7 @@ export function DepositCashDialog({
             )}
           </div>
 
-          {/* Reference No */}
+          {/* Reference */}
           <div className="space-y-2">
             <Label>
               Deposit Slip / Reference No.
@@ -266,7 +269,7 @@ export function DepositCashDialog({
             />
           </div>
 
-          {/* Submit Button */}
+          {/* Submit */}
           <Button
             type="submit"
             className="w-full"
