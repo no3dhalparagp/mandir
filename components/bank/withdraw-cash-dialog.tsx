@@ -16,7 +16,7 @@ import { createFundTransfer } from "@/app/dashboard/bank/transfers/actions"
 const schema = z.object({
   fromAccountId: z.string().min(1, "Select source bank account"),
   toAccountId: z.string().min(1, "Select target cash account"),
-  amount: z.coerce.number().min(1, "Amount must be greater than 0"),
+  amount: z.number({ error: "Amount is required" }).min(1, "Amount must be greater than 0"),
   referenceNo: z.string().optional(),
   notes: z.string().optional(),
 })
@@ -102,7 +102,11 @@ export function WithdrawCashDialog({
           </div>
           <div className="space-y-2">
             <Label>Amount (₹) *</Label>
-            <Input type="number" step="0.01" {...register("amount")} />
+            <Input
+              type="number"
+              step="0.01"
+              {...register("amount", { valueAsNumber: true })}
+            />
             {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
           </div>
           <div className="space-y-2">
