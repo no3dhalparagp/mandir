@@ -3,9 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
-
 import { getAccountBalance } from "@/app/dashboard/bank/actions"
-
 import {
   requirePermission,
   requireAuth,
@@ -15,316 +13,22 @@ import {
 /*                         Recalculate Account Balance                        */
 /* -------------------------------------------------------------------------- */
 
-async function recalculateBalancesForAccount(
-  accountId: string
-) {
+async function recalculateBalancesForAccount(accountId: string) {
   const entries = await prisma.ledgerEntry.findMany({
     where: { accountId },
-
-    orderBy: {
-      date: "asc",
-    },
+    orderBy: { date: "asc" },
   })
 
   let balance = 0
 
   for (const entry of entries) {
-    const isDebit = [
-      "EXPENSE",
-      "TRANSFER_OUT",
-    ].includes(entry.type)
-
-    balance = isDebit
-      ? balance - entry.amount
-      : balance + entry.amount
+    const isDebit = ["EXPENSE", "TRANSFER_OUT"].includes(entry.type)
+    balance = isDebit ? balance - entry.amount : balance + entry.amount
 
     await prisma.ledgerEntry.update({
-      where: {
-        id: entry.id,
-      },
-
-      data: {
-        runningBalance: balance,
-      },
+      where: { id: entry.id },
+      data: { runningBalance: balance },
     })
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/*                           Pending Collections                              */
-/* -------------------------------------------------------------------------- */
-
-export async function getPendingCollections() {
-  await requirePermission(
-    "collections",
-    "read"
-  )
-
-  return prisma.memberCollection.findMany({
-    where: {
-      status: {
-        in: ["COLLECTED", "DEPOSITED"],
-      },
-    },
-
-    include: {
-      member: true,
-      donation: true,
-      depositedToAccount: true,
-    },
-
-    orderBy: {
-      collectedDate: "desc",
-    },
-  })
-}
-
-/* -------------------------------------------------------------------------- */
-/*                             All Collections                                */
-/* -------------------------------------------------------------------------- */
-
-export async function getAllCollections() {
-  // Only login required
-  await requireAuth()
-
-  const session = await auth()
-
-  let whereClause = {}
-
-  if (session?.user?.id) {
-    const user = await prisma.user.findUnique({
-      where: {
-        id: session.user.id,
-      },
-
-      include: {
-        member: true,
-      },
-    })
-
-    // Normal members only see own collections
-    if (
-      user &&
-      ![
-        "SUPER_ADMIN",
-        "COMMITTEE_ADMIN",
-        "ACCOUNTANT",
-      ].includes(user.role)
-    ) {
-      if (user.member) {
-        whereClause = {
-          memberId: user.member.id,
-        }
-      } else {
-        return []
-      }
-    }
-  }
-
-  return prisma.memberCollection.findMany({
-    where: whereClause,
-
-    include: {
-      member: true,
-
-      donation: true,
-
-      depositedToAccount: true,
-
-      verifiedBy: {
-        select: {
-          name: true,
-        },
-      },
-    },
-
-    orderBy: {
-      collectedDate: "desc",
-    },
-
-    take: 100,
-  })
-}
-
-/* -------------------------------------------------------------------------- */
-/*                              Member Ledger                                 */
-/* -------------------------------------------------------------------------- */
-
-export async function getMemberLedger(
-  memberId: string
-) {
-  await requireAuth()
-
-  const collections =
-    await prisma.memberCollection.findMany({
-      where: {
-        memberId,
-      },
-
-      include: {
-        donation: true,
-
-        depositedToAccount: true,
-
-        verifiedBy: {
-          select: {
-            name: true,
-          },
-        },
-      },
-
-      orderBy: {
-        collectedDate: "desc",
-      },
-    })
-
-  /* ---------------------------------------------------------------------- */
-  /*                                 Totals                                 */
-  /* ---------------------------------------------------------------------- */
-
-  // Total collection made
-  const totalCollected = collections.reduce(
-    (s, c) => s + c.collectedAmount,
-    0
-  )
-
-  // Deposited amount
-  // DISCREPANT excluded
-  const totalDeposited = collections
-    .filter((c) =>
-      ["DEPOSITED", "VERIFIED"].includes(
-        c.status
-      )
-    )
-    .reduce(
-      (s, c) =>
-        s +
-        (c.verifiedAmount ??
-          c.collectedAmount),
-      0
-    )
-
-  // Successfully verified amount
-  const totalVerified = collections
-    .filter((c) => c.status === "VERIFIED")
-    .reduce(
-      (s, c) =>
-        s +
-        (c.verifiedAmount ??
-          c.collectedAmount),
-      0
-    )
-
-  // Still with member
-  const pendingDeposit = collections
-    .filter((c) => c.status === "COLLECTED")
-    .reduce(
-      (s, c) => s + c.collectedAmount,
-      0
-    )
-
-  // Submitted but not verified
-  const pendingVerification = collections
-    .filter((c) => c.status === "DEPOSITED")
-    .reduce(
-      (s, c) => s + c.collectedAmount,
-      0
-    )
-
-  /* ---------------------------------------------------------------------- */
-  /*                         Discrepancy / Recovery                          */
-  /* ---------------------------------------------------------------------- */
-
-  // Recovery amount from discrepancy
-  const recollectionRequired = collections
-    .filter((c) => c.status === "DISCREPANT")
-    .reduce((s, c) => {
-      const verified = c.verifiedAmount ?? 0
-
-      return (
-        s +
-        (c.collectedAmount - verified)
-      )
-    }, 0)
-
-  // Full discrepant collection list
-  const discrepantCollections =
-    collections.filter(
-      (c) => c.status === "DISCREPANT"
-    )
-
-  /* ---------------------------------------------------------------------- */
-  /*                              Outstanding                               */
-  /* ---------------------------------------------------------------------- */
-
-  const outstanding =
-    pendingDeposit +
-    pendingVerification +
-    recollectionRequired
-
-  return {
-    collections,
-
-    totalCollected,
-
-    totalDeposited,
-
-    totalVerified,
-
-    pendingDeposit,
-
-    pendingVerification,
-
-    recollectionRequired,
-
-    discrepantCollections,
-
-    outstanding,
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/*                        Mark Collection Deposited                           */
-/* -------------------------------------------------------------------------- */
-
-export async function markCollectionDeposited(
-  collectionId: string,
-  depositedToAccountId: string,
-  depositSlipNo?: string
-) {
-  try {
-    await requirePermission(
-      "collections",
-      "deposit"
-    )
-
-    await prisma.memberCollection.update({
-      where: {
-        id: collectionId,
-      },
-
-      data: {
-        status: "DEPOSITED",
-
-        depositedToAccountId,
-
-        depositedDate: new Date(),
-
-        depositSlipNo,
-      },
-    })
-
-    revalidatePath("/dashboard/collections")
-
-    return {
-      success: true,
-    }
-  } catch (error: any) {
-    return {
-      error:
-        error.message ||
-        "Failed to mark as deposited.",
-    }
   }
 }
 
@@ -338,106 +42,66 @@ export async function verifyCollection(
   discrepancyNote?: string
 ) {
   try {
-    await requirePermission(
-      "collections",
-      "verify"
-    )
-
+    await requirePermission("collections", "verify")
     const user = await requireAuth()
 
-    const collection =
-      await prisma.memberCollection.findUnique({
-        where: {
-          id: collectionId,
-        },
-
-        include: {
-          donation: {
-            include: {
-              account: true,
-            },
-          },
-
-          depositedToAccount: true,
-        },
-      })
+    const collection = await prisma.memberCollection.findUnique({
+      where: { id: collectionId },
+      include: {
+        donation: { include: { account: true } },
+        depositedToAccount: true,
+      },
+    })
 
     if (!collection) {
-      return {
-        error: "Collection not found.",
-      }
+      return { error: "Collection not found." }
     }
 
-    const hasDiscrepancy =
-      verifiedAmount !==
-      collection.collectedAmount
+    const hasDiscrepancy = verifiedAmount !== collection.collectedAmount
 
+    // Update the collection record
     await prisma.memberCollection.update({
-      where: {
-        id: collectionId,
-      },
-
+      where: { id: collectionId },
       data: {
-        status: hasDiscrepancy
-          ? "DISCREPANT"
-          : "VERIFIED",
-
+        status: hasDiscrepancy ? "DISCREPANT" : "VERIFIED",
         verifiedById: user.id,
-
         verifiedAt: new Date(),
-
         verifiedAmount,
-
-        discrepancyNote: hasDiscrepancy
-          ? discrepancyNote
-          : null,
+        discrepancyNote: hasDiscrepancy ? discrepancyNote : null,
       },
     })
 
     const targetAccountId =
-      collection.depositedToAccountId ??
-      collection.donation.accountId
+      collection.depositedToAccountId ?? collection.donation.accountId
 
     const targetAccountName =
-      collection.depositedToAccount?.name ??
-      collection.donation.account?.name
+      collection.depositedToAccount?.name ?? collection.donation.account?.name
 
     /* ---------------------------------------------------------------------- */
     /*                         Create Ledger Entry                            */
     /* ---------------------------------------------------------------------- */
 
     if (!hasDiscrepancy && targetAccountId) {
-      const existingEntry =
-        await prisma.ledgerEntry.findFirst({
-          where: {
-            referenceType:
-              "MEMBER_COLLECTION",
-
-            referenceId: collectionId,
-          },
-        })
+      const existingEntry = await prisma.ledgerEntry.findFirst({
+        where: {
+          referenceType: "MEMBER_COLLECTION",
+          referenceId: collectionId,
+        },
+      })
 
       if (!existingEntry) {
         await prisma.ledgerEntry.create({
           data: {
             accountId: targetAccountId,
-
             type: "MEMBER_DEPOSIT",
-
             amount: verifiedAmount,
-
             description: `Collection by member - Donation: ${collection.donation.receiptNo}`,
-
-            referenceType:
-              "MEMBER_COLLECTION",
-
+            referenceType: "MEMBER_COLLECTION",
             referenceId: collectionId,
           },
         })
 
-        await recalculateBalancesForAccount(
-          targetAccountId
-        )
+        await recalculateBalancesForAccount(targetAccountId)
       }
     }
 
@@ -448,10 +112,7 @@ export async function verifyCollection(
     let currentBalance = undefined
 
     if (!hasDiscrepancy && targetAccountId) {
-      currentBalance =
-        await getAccountBalance(
-          targetAccountId
-        )
+      currentBalance = await getAccountBalance(targetAccountId)
     }
 
     revalidatePath("/dashboard/collections")
@@ -460,17 +121,12 @@ export async function verifyCollection(
 
     return {
       success: true,
-
       balance: currentBalance,
-
-      accountName:
-        targetAccountName ?? undefined,
+      accountName: targetAccountName ?? undefined,
     }
   } catch (error: any) {
     return {
-      error:
-        error.message ||
-        "Failed to verify collection.",
+      error: error.message || "Failed to verify collection.",
     }
   }
 }
