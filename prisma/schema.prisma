@@ -705,8 +705,6 @@ model MemberAccount {
   updatedAt         DateTime @updatedAt
 
   passbooks         Passbook[]
-
-  @@index([memberId])
 }
 
 model Passbook {
