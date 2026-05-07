@@ -16,7 +16,7 @@ import { createExpense } from "@/app/dashboard/expenses/actions"
 const expenseSchema = z.object({
   title: z.string().min(2, "Title is required."),
   category: z.string(),
-  amount: z.coerce.number().min(1, "Amount is required"),
+  amount: z.number({ error: "Amount is required" }).min(1, "Amount must be positive"),
   vendorName: z.string().optional(),
   vendorMobile: z.string().optional(),
   paymentMode: z.string(),
@@ -84,7 +84,11 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
         </div>
         <div className="space-y-2">
           <Label>Amount (₹) *</Label>
-          <Input type="number" step="0.01" {...register("amount")} />
+          <Input
+            type="number"
+            step="0.01"
+            {...register("amount", { valueAsNumber: true })}
+          />
           {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
         </div>
       </div>
@@ -105,7 +109,13 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Payment Mode</Label>
-          <Select onValueChange={(v) => { setValue("paymentMode", v as string); setPaymentMode(v as string) }} defaultValue="CASH">
+          <Select
+            onValueChange={(v) => {
+              setValue("paymentMode", v as string);
+              setPaymentMode(v as string);
+            }}
+            defaultValue="CASH"
+          >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="CASH">Cash</SelectItem>
