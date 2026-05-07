@@ -130,3 +130,27 @@ export async function verifyCollection(
     }
   }
 }
+export async function markCollectionDeposited(
+  collectionId: string,
+  depositedToAccountId: string,
+  depositSlipNo?: string
+) {
+  try {
+    await requirePermission("collections", "deposit")
+
+    await prisma.memberCollection.update({
+      where: { id: collectionId },
+      data: {
+        status: "DEPOSITED",
+        depositedToAccountId,
+        depositedDate: new Date(),
+        depositSlipNo,
+      },
+    })
+
+    revalidatePath("/dashboard/collections")
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message || "Failed to mark as deposited." }
+  }
+}
