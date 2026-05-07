@@ -183,6 +183,8 @@ model User {
   auditLogs              AuditLog[]
   loginHistories         LoginHistory[]
   activeSessions         ActiveSession[]
+  staffDetail            StaffDetail?
+  vouchers               Voucher[]               @relation("CreatedVouchers")
 }
 
 // ─── Chart of Accounts ─────────────────────────────────────────────────────────
@@ -200,8 +202,9 @@ model ChartOfAccount {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  bankAccount    BankAccount?
-  journalEntries JournalEntry[]
+  bankAccount      BankAccount?
+  journalEntries   JournalEntry[]
+  voucherLineItems VoucherLineItem[]
 }
 
 // ─── Double-Entry Accounting Transaction ───────────────────────────────────────
@@ -267,6 +270,7 @@ model BankAccount {
   chequeLeaves    ChequeBookLeaf[]
   bankPassbooks   BankPassbook[]
   depositVerifications DepositVerification[]
+  vouchers        Voucher[]
 }
 
 // ─── Fund Transfer between accounts ──────────────────────────────────────────
@@ -310,6 +314,7 @@ model Member {
   donations   Donation[]         @relation("CollectedByMember")
   memberAccount MemberAccount?
   depositVerifications DepositVerification[]
+  vouchers    Voucher[]          @relation("CollectionVouchers")
 }
 
 // ─── Donations ────────────────────────────────────────────────────────────────
@@ -441,6 +446,9 @@ model ChequeRegister {
 
   chequeLeafId String?         @unique @db.ObjectId
   chequeLeaf   ChequeBookLeaf? @relation(fields: [chequeLeafId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  voucherId    String?         @unique @db.ObjectId
+  voucher      Voucher?        @relation(fields: [voucherId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model ChequeBook {
@@ -799,4 +807,174 @@ enum DepositStatus {
   VERIFIED
   REJECTED
   RECONCILED
+}
+
+// ─── Voucher System ──────────────────────────────────────────────────────────
+
+enum VoucherType {
+  CASH_ENTRY    // Income voucher
+  PAYMENT       // Expense/Payment voucher
+  COLLECTION    // Member collection voucher
+  JOURNAL       // GL adjustment voucher
+  BANK_TRANSFER // Fund transfer voucher
+}
+
+enum VoucherStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+model Voucher {
+  id                String        @id @default(auto()) @map("_id") @db.ObjectId
+  voucherNo         String        @unique // VCH-YYYY-MM-001 format
+  voucherType       VoucherType
+  status            VoucherStatus @default(DRAFT)
+  voucherDate       DateTime      @default(now())
+  
+  // Reference info
+  description       String?
+  partyName         String?
+  partyLedgerId     String?       @db.ObjectId
+  partyLedger       PartyLedger?  @relation(fields: [partyLedgerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  // Amount details
+  totalAmount       Float         @default(0)
+  paymentMode       PaymentMode   @default(CASH)
+  chequeNumber      String?
+  chequeDate        DateTime?
+  bankName          String?
+  
+  // Bank account for cash entry
+  accountId         String?       @db.ObjectId
+  account           BankAccount?  @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  // Member collection reference
+  collectionMemberId String?      @db.ObjectId
+  collectionMember   Member?      @relation("CollectionVouchers", fields: [collectionMemberId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  // Journal entry reference
+  journalEntryId    String?       @db.ObjectId
+  
+  notes             String?
+  attachmentUrl     String?
+  
+  // Audit fields
+  createdById       String?       @db.ObjectId
+  createdBy         User?         @relation("CreatedVouchers", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  postedById        String?       @db.ObjectId
+  postedAt          DateTime?
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Relations
+  lineItems         VoucherLineItem[]
+  chequeEntry       ChequeRegister?
+  
+  @@index([voucherType])
+  @@index([status])
+  @@index([voucherDate])
+  @@index([createdById])
+}
+
+model VoucherLineItem {
+  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+  voucherId       String         @db.ObjectId
+  voucher         Voucher        @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  
+  accountId       String         @db.ObjectId
+  account         ChartOfAccount @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  entryType       EntryType
+  amount          Float
+  description     String?
+  
+  createdAt       DateTime       @default(now())
+  
+  @@index([voucherId])
+  @@index([accountId])
+}
+
+// ─── Party Ledger ────────────────────────────────────────────────────────────
+
+model PartyLedger {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  partyName       String
+  partyType       String        // VENDOR, CUSTOMER, MEMBER, PARTY
+  partyCode       String        @unique
+  email           String?
+  mobile          String?
+  address         String?
+  paymentTerms    String?       // e.g., "30 days", "Net 15"
+  
+  openingBalance  Float         @default(0)
+  currentBalance  Float         @default(0)
+  
+  isActive        Boolean       @default(true)
+  notes           String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  vouchers        Voucher[]
+  transactions    PartyTransaction[]
+  
+  @@index([partyName])
+}
+
+model PartyTransaction {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  partyLedgerId   String        @db.ObjectId
+  partyLedger     PartyLedger   @relation(fields: [partyLedgerId], references: [id], onDelete: Cascade)
+  
+  transactionDate DateTime      @default(now())
+  description     String
+  referenceNo     String?
+  referenceType   String?       // VOUCHER, INVOICE, BILL, CHEQUE
+  
+  debitAmount     Float         @default(0)
+  creditAmount    Float         @default(0)
+  balance         Float         @default(0)
+  
+  createdAt       DateTime      @default(now())
+  
+  @@index([partyLedgerId])
+  @@index([transactionDate])
+}
+
+// ─── Staff & User Details ────────────────────────────────────────────────────
+
+model StaffDetail {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String        @unique @db.ObjectId
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  designation     String?
+  department      String?
+  employeeCode    String?       @unique
+  dateOfJoining   DateTime?
+  dateOfBirth     DateTime?
+  
+  // Banking details
+  bankName        String?
+  accountNumber   String?
+  ifscCode        String?
+  accountHolderName String?
+  
+  // Contact
+  personalMobile  String?
+  alternateEmail  String?
+  
+  // Documents
+  panCard         String?
+  aadharCard      String?
+  
+  salary          Float?
+  notes           String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }

@@ -24,6 +24,7 @@ import {
   Lock,
   User,
   CheckCircle2,
+  Receipt,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -74,6 +75,11 @@ const navGroups: NavGroup[] = [
   {
     label: "Finance",
     items: [
+      {
+        title: "Vouchers",
+        url: "/dashboard/vouchers",
+        icon: Receipt,
+      },
       {
         title: "Donations",
         url: "/dashboard/donations",
