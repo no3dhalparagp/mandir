@@ -35,7 +35,7 @@ export function VerifyCollectionButton({
 
   return (
     <Dialog>
-      <DialogTrigger asChild>
+      <DialogTrigger>
         <Button size="sm" variant="outline">Verify</Button>
       </DialogTrigger>
       <DialogContent>
