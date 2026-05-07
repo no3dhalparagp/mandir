@@ -22,25 +22,59 @@ function getErrorMessage(error: unknown, fallback: string) {
 /* -------------------------------------------------------------------------- */
 /*                         Recalculate Account Balance                        */
 /* -------------------------------------------------------------------------- */
+async function recalculateBalancesForAccount(
+  accountId: string
+) {
+  const entries =
+    await prisma.ledgerEntry.findMany({
+      where: {
+        accountId,
 
-async function recalculateBalancesForAccount(accountId: string) {
-  const entries = await prisma.ledgerEntry.findMany({
-    where: { accountId },
-    orderBy: { date: "asc" },
-  })
+        OR: [
+          {
+            isCleared: true,
+          },
+          {
+            isCleared: null,
+          },
+        ],
+      },
+
+      orderBy: [
+        {
+          date: "asc",
+        },
+        {
+          createdAt: "asc",
+        },
+      ],
+    })
 
   let balance = 0
 
   for (const entry of entries) {
-    const isDebit = ["EXPENSE", "TRANSFER_OUT"].includes(entry.type)
-    balance = isDebit ? balance - entry.amount : balance + entry.amount
+    const isDebit = [
+      "EXPENSE",
+      "TRANSFER_OUT",
+    ].includes(entry.type)
+
+    balance = isDebit
+      ? balance - entry.amount
+      : balance + entry.amount
 
     await prisma.ledgerEntry.update({
-      where: { id: entry.id },
-      data: { runningBalance: balance },
+      where: {
+        id: entry.id,
+      },
+
+      data: {
+        runningBalance: balance,
+      },
     })
   }
 }
+
+    
 
 /* -------------------------------------------------------------------------- */
 /*                           Pending Collections                              */
