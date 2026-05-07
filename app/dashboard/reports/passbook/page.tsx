@@ -36,7 +36,7 @@ export default async function PassbookPage({
   const startDate = new Date(currentYear, currentMonth - 1, 1)
   const endDate = new Date(currentYear, currentMonth, 0, 23, 59, 59)
 
-  let entries = []
+  let entries: any[] = []
   let openingBalance = 0
 
   if (currentMember?.memberAccount) {

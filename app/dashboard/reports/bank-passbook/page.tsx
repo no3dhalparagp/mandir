@@ -42,7 +42,7 @@ export default async function BankPassbookPage() {
 
   return (
     <BankPassbookClient
-      bankAccounts={bankAccounts}
+      bankAccounts={bankAccounts as any}
       depositVerifications={JSON.parse(JSON.stringify(depositVerifications))}
       userRole={session.user.role}
     />

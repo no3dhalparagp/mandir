@@ -33,7 +33,7 @@ export default async function DepositsPage() {
       accountNumber: true,
     },
     orderBy: { name: "asc" },
-  })
+  }) as any[]
 
   // Fetch pending and verified deposits
   const deposits = await prisma.depositVerification.findMany({
@@ -49,7 +49,7 @@ export default async function DepositsPage() {
 
   return (
     <DepositVerificationClient
-      bankAccounts={bankAccounts}
+      bankAccounts={bankAccounts as any}
       deposits={JSON.parse(JSON.stringify(deposits))}
     />
   )

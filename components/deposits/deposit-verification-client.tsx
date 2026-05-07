@@ -88,7 +88,7 @@ export function DepositVerificationClient({
   });
 
   const createForm = useForm<CreateDepositData>({
-    resolver: zodResolver(createDepositSchema),
+    resolver: zodResolver(createDepositSchema) as any,
     defaultValues: {
       bankAccountId: bankAccounts[0]?.id || "",
       depositAmount: 0,
@@ -173,7 +173,7 @@ export function DepositVerificationClient({
           <p className="text-muted-foreground">Verify collected deposits and create bank transactions</p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
+          <DialogTrigger>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
               Create Deposit
@@ -405,7 +405,7 @@ export function DepositVerificationClient({
                           if (!open) setVerifyingDepositId(null);
                           else setVerifyingDepositId(deposit.id);
                         }}>
-                          <DialogTrigger asChild>
+                          <DialogTrigger>
                             <Button variant="sm" size="sm">
                               Verify
                             </Button>
