@@ -637,4 +637,76 @@ export async function verifyCollection(
       error: getErrorMessage(error, "Failed to verify collection."),
     }
   }
+
 }
+
+export async function encashChequeEntry(
+  ledgerEntryId: string
+) {
+  try {
+    await requirePermission(
+      "bank",
+      "update"
+    )
+
+    const entry =
+      await prisma.ledgerEntry.findUnique({
+        where: {
+          id: ledgerEntryId,
+        },
+
+        include: {
+          account: true,
+        },
+      })
+
+    if (!entry) {
+      return {
+        error: "Ledger entry not found.",
+      }
+    }
+
+    if (entry.isCleared) {
+      return {
+        error:
+          "Cheque already encashed.",
+      }
+    }
+
+    await prisma.ledgerEntry.update({
+      where: {
+        id: ledgerEntryId,
+      },
+
+      data: {
+        isCleared: true,
+
+        clearedAt: new Date(),
+      },
+    })
+
+    await recalculateBalancesForAccount(
+      entry.accountId
+    )
+
+    revalidatePath(
+      "/dashboard/bank"
+    )
+
+    revalidatePath(
+      "/dashboard/journal"
+    )
+
+    return {
+      success: true,
+    }
+  } catch (error: unknown) {
+    return {
+      error: getErrorMessage(
+        error,
+        "Failed to encash cheque."
+      ),
+    }
+  }
+}
+
