@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Loader2 } from "lucide-react"
@@ -11,46 +11,82 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { createDonation } from "@/app/dashboard/donations/actions"
 
-const donationSchema = z.object({
-  donorName: z.string().min(2, "Name is required."),
-  mobileNumber: z.string().optional(),
-  address: z.string().optional(),
-  category: z.enum([
-    "GENERAL",
-    "PUJA",
-    "FESTIVAL",
-    "CONSTRUCTION",
-    "ANNADAN",
-    "SPECIAL",
-    "SEWA",
-    "TRUST_FUND",
-  ]),
-  amount: z.number({ error: "Amount is required" }).min(1, "Amount must be positive"),
-  paymentMode: z.enum([
-    "CASH",
-    "CHEQUE",
-    "DD",
-    "UPI",
-    "NEFT",
-    "RTGS",
-    "IMPS",
-  ]),
-  transactionId: z.string().optional(),
-  chequeNumber: z.string().optional(),
-  chequeDate: z.string().optional(),
-  bankNameCheque: z.string().optional(),
-  accountId: z.string().optional(),
-  collectedByMemberId: z.string().optional(),
-  notes: z.string().optional(),
-}).refine(data => data.accountId || data.collectedByMemberId, {
-  message: "Either select a Deposit Account or a Collected by Member.",
-  path: ["accountId"],
-})
+// ------------------------------------------------------------------
+// Constants
+// ------------------------------------------------------------------
+const CATEGORIES = [
+  "GENERAL",
+  "PUJA",
+  "FESTIVAL",
+  "CONSTRUCTION",
+  "ANNADAN",
+  "SPECIAL",
+  "SEWA",
+  "TRUST_FUND",
+] as const
+
+const PAYMENT_MODES = [
+  "CASH",
+  "CHEQUE",
+  "DD",
+  "UPI",
+  "NEFT",
+  "RTGS",
+  "IMPS",
+] as const
+
+// ------------------------------------------------------------------
+// Schema
+// ------------------------------------------------------------------
+const donationSchema = z
+  .object({
+    donorName: z.string().min(2, "Name is required."),
+    mobileNumber: z.string().optional(),
+    address: z.string().optional(),
+    category: z.enum(CATEGORIES),
+    amount: z
+      .number({ error: "Amount is required" })
+      .min(1, "Amount must be positive"),
+    paymentMode: z.enum(PAYMENT_MODES),
+    transactionId: z.string().optional(),
+    chequeNumber: z.string().optional(),
+    chequeDate: z.string().optional(),
+    bankNameCheque: z.string().optional(),
+    accountId: z.string().optional(),
+    collectedByMemberId: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .refine(
+    (data) => data.accountId || data.collectedByMemberId,
+    {
+      message: "Either select a Deposit Account or a Collected by Member.",
+      path: ["accountId", "collectedByMemberId"],
+    }
+  )
+  .refine(
+    (data) => {
+      // For CASH payments by non-admin users, a collector is required
+      // because they cannot deposit to an account.
+      return !(
+        data.paymentMode === "CASH" &&
+        !data.accountId && // no account selected (disabled anyway)
+        !data.collectedByMemberId
+      )
+    },
+    {
+      message: "Please select a collector for cash payments.",
+      path: ["collectedByMemberId"],
+    }
+  )
 
 type DonationFormData = z.infer<typeof donationSchema>
 
@@ -62,76 +98,92 @@ interface DonationFormProps {
   isAdminOrAccountant?: boolean | null
 }
 
-export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId, isAdminOrAccountant }: DonationFormProps) {
+export function DonationForm({
+  onSuccess,
+  accounts,
+  collectors,
+  loggedInMemberId,
+  isAdminOrAccountant,
+}: DonationFormProps) {
   const [isPending, startTransition] = React.useTransition()
-  const [paymentMode, setPaymentMode] = React.useState<DonationFormData["paymentMode"]>("CASH")
+  const isAdmin = !!isAdminOrAccountant // treat null/undefined as false
 
   const {
-    register, handleSubmit, setValue, formState: { errors },
+    register,
+    handleSubmit,
+    control,
+    watch,
+    setValue,
+    formState: { errors },
   } = useForm<DonationFormData>({
     resolver: zodResolver(donationSchema),
-    defaultValues: { 
-      category: "GENERAL", 
+    defaultValues: {
+      category: "GENERAL",
       paymentMode: "CASH",
-      collectedByMemberId: loggedInMemberId || undefined
+      collectedByMemberId: loggedInMemberId || undefined,
     },
   })
+
+  const watchedPaymentMode = watch("paymentMode")
+  const isCASH = watchedPaymentMode === "CASH"
+  const showChequeFields = watchedPaymentMode === "CHEQUE" || watchedPaymentMode === "DD"
+  const showTxnField = ["UPI", "NEFT", "RTGS", "IMPS"].includes(watchedPaymentMode)
+
+  // Reset account selection when payment mode changes, and auto‑set collector for cash
+  React.useEffect(() => {
+    setValue("accountId", "")
+    if (isCASH && !isAdmin && loggedInMemberId) {
+      setValue("collectedByMemberId", loggedInMemberId)
+    }
+  }, [watchedPaymentMode, isCASH, isAdmin, loggedInMemberId, setValue])
+
+  // Memoized account list based on payment mode and role
+  const filteredAccounts = React.useMemo(
+    () =>
+      accounts.filter((a) => {
+        if (isCASH) {
+          // Only cash‑in‑hand accounts, and only admins/accountants can deposit
+          if (!isAdmin) return false
+          return a.accountType === "CASH_IN_HAND"
+        }
+        // For non‑cash, show bank accounts (not cash book)
+        return a.accountType !== "CASH_IN_HAND"
+      }),
+    [accounts, isCASH, isAdmin]
+  )
+
+  const disableDepositAccount = isCASH && !isAdmin
 
   function onSubmit(data: DonationFormData) {
     startTransition(async () => {
       const result = await createDonation(data)
       if (result.error) toast.error(result.error)
-      else { toast.success("Donation added successfully!"); onSuccess() }
+      else {
+        toast.success("Donation added successfully!")
+        onSuccess()
+      }
     })
   }
-
-  const showChequeFields = paymentMode === "CHEQUE" || paymentMode === "DD"
-  const showTxnField = ["UPI", "NEFT", "RTGS", "IMPS"].includes(paymentMode)
-  const isCASH = paymentMode === "CASH"
-
-  React.useEffect(() => {
-    // Reset account ID when payment mode changes because the available accounts change
-    setValue("accountId", "")
-    
-    // Auto-assign member collection if it's a standard member receiving cash
-    if (paymentMode === "CASH" && !isAdminOrAccountant && loggedInMemberId) {
-      setValue("collectedByMemberId", loggedInMemberId)
-    }
-  }, [paymentMode, isAdminOrAccountant, loggedInMemberId, setValue])
-
-  // Filter accounts based on payment mode and role
-  const filteredAccounts = accounts.filter(a => {
-    if (isCASH) {
-      // For CASH, only show CASH_IN_HAND accounts (Cash Book)
-      // And only Admins/Accountants can deposit directly to Cash Book
-      if (!isAdminOrAccountant) return false
-      return a.accountType === "CASH_IN_HAND"
-    } else {
-      // For online payments, show bank accounts (not cash book)
-      return a.accountType !== "CASH_IN_HAND"
-    }
-  })
-
-  // Disable account selection if it's CASH and standard member
-  const disableDepositAccount = isCASH && !isAdminOrAccountant
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
       {/* Donor Details */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Donor Name *</Label>
-          <Input {...register("donorName")} />
-          {errors.donorName && <p className="text-xs text-destructive">{errors.donorName.message}</p>}
+          <Label htmlFor="donorName">Donor Name *</Label>
+          <Input id="donorName" {...register("donorName")} />
+          {errors.donorName && (
+            <p className="text-xs text-destructive">{errors.donorName.message}</p>
+          )}
         </div>
         <div className="space-y-2">
-          <Label>Mobile Number</Label>
-          <Input {...register("mobileNumber")} />
+          <Label htmlFor="mobileNumber">Mobile Number</Label>
+          <Input id="mobileNumber" {...register("mobileNumber")} />
         </div>
       </div>
       <div className="space-y-2">
-        <Label>Address</Label>
-        <Input {...register("address")} />
+        <Label htmlFor="address">Address</Label>
+        <Input id="address" {...register("address")} />
       </div>
 
       <Separator />
@@ -139,72 +191,103 @@ export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId
       {/* Payment Details */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Category</Label>
-          <Select onValueChange={(v) => setValue("category", v as DonationFormData["category"])} defaultValue="GENERAL">
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="GENERAL">General</SelectItem>
-              <SelectItem value="PUJA">Puja</SelectItem>
-              <SelectItem value="FESTIVAL">Festival</SelectItem>
-              <SelectItem value="CONSTRUCTION">Construction</SelectItem>
-              <SelectItem value="ANNADAN">Annadan</SelectItem>
-              <SelectItem value="SPECIAL">Special</SelectItem>
-              <SelectItem value="SEWA">Sewa</SelectItem>
-              <SelectItem value="TRUST_FUND">Trust Fund</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label htmlFor="category">Category</Label>
+          <Controller
+            name="category"
+            control={control}
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value}>
+                <SelectTrigger id="category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat.charAt(0) + cat.slice(1).toLowerCase().replace("_", " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
         <div className="space-y-2">
-          <Label>Amount (₹) *</Label>
+          <Label htmlFor="amount">Amount (₹) *</Label>
           <Input
+            id="amount"
             type="number"
             step="0.01"
             {...register("amount", { valueAsNumber: true })}
           />
-          {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
+          {errors.amount && (
+            <p className="text-xs text-destructive">{errors.amount.message}</p>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Payment Mode</Label>
-          <Select
-            onValueChange={(v) => {
-              const mode = v as DonationFormData["paymentMode"];
-              setValue("paymentMode", mode);
-              setPaymentMode(mode);
-            }}
-            defaultValue="CASH"
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CASH">Cash</SelectItem>
-              <SelectItem value="CHEQUE">Cheque</SelectItem>
-              {isAdminOrAccountant && (
-                <>
-                  <SelectItem value="UPI">UPI</SelectItem>
-                  <SelectItem value="NEFT">NEFT</SelectItem>
-                  <SelectItem value="RTGS">RTGS</SelectItem>
-                  <SelectItem value="IMPS">IMPS</SelectItem>
-                  <SelectItem value="DD">Demand Draft</SelectItem>
-                </>
-              )}
-            </SelectContent>
-          </Select>
+          <Label htmlFor="paymentMode">Payment Mode</Label>
+          <Controller
+            name="paymentMode"
+            control={control}
+            render={({ field }) => (
+              <Select
+                onValueChange={field.onChange}
+                value={field.value}
+              >
+                <SelectTrigger id="paymentMode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CASH">Cash</SelectItem>
+                  <SelectItem value="CHEQUE">Cheque</SelectItem>
+                  {isAdmin && (
+                    <>
+                      <SelectItem value="UPI">UPI</SelectItem>
+                      <SelectItem value="NEFT">NEFT</SelectItem>
+                      <SelectItem value="RTGS">RTGS</SelectItem>
+                      <SelectItem value="IMPS">IMPS</SelectItem>
+                      <SelectItem value="DD">Demand Draft</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
         <div className="space-y-2">
-          <Label>Deposit to Account {disableDepositAccount && "(Disabled for Cash)"}</Label>
-          <Select 
-            onValueChange={(v) => setValue("accountId", (v as string) === "__none" ? "" : v as string)}
-            disabled={disableDepositAccount}
-          >
-            <SelectTrigger><SelectValue placeholder={disableDepositAccount ? "N/A" : "Select account"} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none">— Direct —</SelectItem>
-              {filteredAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {errors.accountId && <p className="text-xs text-destructive">{errors.accountId.message}</p>}
+          <Label htmlFor="accountId">
+            Deposit to Account {disableDepositAccount ? "(Not available for cash)" : ""}
+          </Label>
+          <Controller
+            name="accountId"
+            control={control}
+            render={({ field }) => (
+              <Select
+                onValueChange={(v) => field.onChange(v === "__none" ? "" : v)}
+                value={field.value || "__none"}
+                disabled={disableDepositAccount}
+              >
+                <SelectTrigger id="accountId">
+                  <SelectValue
+                    placeholder={disableDepositAccount ? "N/A" : "Select account…"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">— Direct —</SelectItem>
+                  {filteredAccounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {errors.accountId && (
+            <p className="text-xs text-destructive">{errors.accountId.message}</p>
+          )}
         </div>
       </div>
 
@@ -212,16 +295,16 @@ export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId
       {showChequeFields && (
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label>Cheque No.</Label>
-            <Input {...register("chequeNumber")} />
+            <Label htmlFor="chequeNumber">Cheque No.</Label>
+            <Input id="chequeNumber" {...register("chequeNumber")} />
           </div>
           <div className="space-y-2">
-            <Label>Cheque Date</Label>
-            <Input type="date" {...register("chequeDate")} />
+            <Label htmlFor="chequeDate">Cheque Date</Label>
+            <Input id="chequeDate" type="date" {...register("chequeDate")} />
           </div>
           <div className="space-y-2">
-            <Label>Bank Name</Label>
-            <Input {...register("bankNameCheque")} />
+            <Label htmlFor="bankNameCheque">Bank Name</Label>
+            <Input id="bankNameCheque" {...register("bankNameCheque")} />
           </div>
         </div>
       )}
@@ -229,8 +312,12 @@ export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId
       {/* Transaction ID for UPI / NEFT / RTGS */}
       {showTxnField && (
         <div className="space-y-2">
-          <Label>Transaction / Reference ID</Label>
-          <Input {...register("transactionId")} placeholder="UTR / Ref Number" />
+          <Label htmlFor="transactionId">Transaction / Reference ID</Label>
+          <Input
+            id="transactionId"
+            {...register("transactionId")}
+            placeholder="UTR / Ref Number"
+          />
         </div>
       )}
 
@@ -238,32 +325,45 @@ export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId
 
       {/* Collected by Member */}
       <div className="space-y-2">
-        <Label>Collected by Member (optional)</Label>
-        <Select 
-          onValueChange={(v) => setValue("collectedByMemberId", (v as string) === "__none" ? "" : v as string)}
-          defaultValue={loggedInMemberId || undefined}
-          disabled={!!loggedInMemberId && !isAdminOrAccountant}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Direct receipt (not via member)" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none">— Direct Receipt —</SelectItem>
-            {collectors.map((m) => (
-              <SelectItem key={m.id} value={m.id}>{m.name} ({m.memberId})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label htmlFor="collectedByMemberId">Collected by Member (optional)</Label>
+        <Controller
+          name="collectedByMemberId"
+          control={control}
+          render={({ field }) => (
+            <Select
+              onValueChange={(v) => field.onChange(v === "__none" ? "" : v)}
+              value={field.value || "__none"}
+              disabled={!!loggedInMemberId && !isAdmin}
+            >
+              <SelectTrigger id="collectedByMemberId">
+                <SelectValue placeholder="Direct receipt (not via member)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">— Direct Receipt —</SelectItem>
+                {collectors.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name} ({m.memberId})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
         <p className="text-xs text-muted-foreground">
-          {!!loggedInMemberId && !isAdminOrAccountant 
+          {!!loggedInMemberId && !isAdmin
             ? "Your member profile is automatically selected for cash collection."
             : "If collected by a member, it will need accountant verification before entering the Cash Book."}
         </p>
+        {errors.collectedByMemberId && (
+          <p className="text-xs text-destructive">
+            {errors.collectedByMemberId.message}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
-        <Label>Notes</Label>
-        <Input {...register("notes")} />
+        <Label htmlFor="notes">Notes</Label>
+        <Input id="notes" {...register("notes")} />
       </div>
 
       <Button className="w-full" type="submit" disabled={isPending}>
