@@ -25,6 +25,8 @@ import {
   User,
   CheckCircle2,
   Receipt,
+  Users2,
+  Building,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -138,6 +140,8 @@ const navGroups: NavGroup[] = [
     roles: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
     items: [
       { title: "Members", url: "/dashboard/members", icon: Users },
+      { title: "Staff Directory", url: "/dashboard/staff", icon: Users2 },
+      { title: "Parties", url: "/dashboard/parties", icon: Building },
       { title: "Events & Pujas", url: "/dashboard/events", icon: Calendar },
     ],
   },
@@ -156,6 +160,7 @@ const navGroups: NavGroup[] = [
           { title: "Donation Summary", url: "/dashboard/reports/donations" },
           { title: "Expense Summary", url: "/dashboard/reports/expenses" },
           { title: "Cash Book", url: "/dashboard/reports/cash-book" },
+          { title: "Party Ledger", url: "/dashboard/party-ledger" },
         ],
       },
     ],
