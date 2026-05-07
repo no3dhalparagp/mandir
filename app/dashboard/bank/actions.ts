@@ -508,3 +508,41 @@ export async function bulkAddVerifiedCollectionsToCashAccount({
     }
   }
 }
+// File: app/dashboard/bank/actions.ts
+
+export async function getBankAccounts() {
+  await requirePermission(
+    "bank",
+    "read"
+  )
+
+  return prisma.bankAccount.findMany({
+    orderBy: {
+      createdAt: "asc",
+    },
+
+    include: {
+      ledgerEntries: {
+        orderBy: [
+          {
+            date: "desc",
+          },
+          {
+            createdAt: "desc",
+          },
+        ],
+
+        take: 100,
+      },
+
+      _count: {
+        select: {
+          ledgerEntries: true,
+          donations: true,
+          expenses: true,
+        },
+      },
+    },
+  })
+}
+
