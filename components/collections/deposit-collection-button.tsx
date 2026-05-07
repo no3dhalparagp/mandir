@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -44,16 +45,23 @@ export function DepositCollectionButton({
   accounts,
   recollectMode = false,
 }: Props) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] =
+    useState(false)
 
   const [loading, setLoading] =
     useState(false)
 
   const [accountId, setAccountId] =
-    useState("")
+    useState<string>("")
 
-  const [depositSlipNo, setDepositSlipNo] =
-    useState("")
+  const [
+    depositSlipNo,
+    setDepositSlipNo,
+  ] = useState<string>("")
+
+  /* =====================================================
+     SUBMIT
+  ===================================================== */
 
   async function handleSubmit() {
     if (!accountId) return
@@ -70,6 +78,9 @@ export function DepositCollectionButton({
 
       if (result?.success) {
         setOpen(false)
+
+        setAccountId("")
+        setDepositSlipNo("")
       } else {
         alert(
           result?.error ??
@@ -115,7 +126,9 @@ export function DepositCollectionButton({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Account */}
+          {/* ============================================
+              ACCOUNT SELECT
+          ============================================ */}
 
           <div className="space-y-2">
             <Label>
@@ -124,26 +137,44 @@ export function DepositCollectionButton({
 
             <Select
               value={accountId}
-              onValueChange={setAccountId}
+              onValueChange={(
+                value
+              ) => {
+                setAccountId(
+                  value ?? ""
+                )
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Choose account" />
               </SelectTrigger>
 
               <SelectContent>
-                {accounts.map((a) => (
+                {accounts.length ===
+                0 ? (
                   <SelectItem
-                    key={a.id}
-                    value={a.id}
+                    value="NO_ACCOUNT"
+                    disabled
                   >
-                    {a.name}
+                    No account found
                   </SelectItem>
-                ))}
+                ) : (
+                  accounts.map((a) => (
+                    <SelectItem
+                      key={a.id}
+                      value={a.id}
+                    >
+                      {a.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Deposit Slip */}
+          {/* ============================================
+              DEPOSIT SLIP
+          ============================================ */}
 
           <div className="space-y-2">
             <Label>
@@ -161,7 +192,9 @@ export function DepositCollectionButton({
             />
           </div>
 
-          {/* Action */}
+          {/* ============================================
+              SUBMIT BUTTON
+          ============================================ */}
 
           <Button
             className="w-full"
@@ -188,3 +221,4 @@ export function DepositCollectionButton({
     </Dialog>
   )
 }
+
