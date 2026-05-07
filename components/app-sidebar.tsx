@@ -22,6 +22,7 @@ import {
   BookOpen,
   ScrollText,
   Lock,
+  User,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -167,6 +168,12 @@ const navGroups: NavGroup[] = [
         url: "/dashboard/registers/assets",
         icon: Landmark,
       },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { title: "My Profile", url: "/dashboard/profile", icon: User },
     ],
   },
   {
