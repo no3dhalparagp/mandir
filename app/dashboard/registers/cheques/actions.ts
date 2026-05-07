@@ -96,3 +96,67 @@ export async function cancelUnusedChequeLeaf(leafId: string, reason?: string) {
     return { error: message }
   }
 }
+
+export async function updateChequeStatus(chequeId: string, status: "CLEARED" | "BOUNCED", clearedDate?: Date, bouncedReason?: string) {
+  try {
+    await requirePermission("registers", "manage")
+    const cheque = await prisma.chequeRegister.findUnique({
+      where: { id: chequeId },
+      include: { account: true },
+    })
+
+    if (!cheque) return { error: "Cheque not found." }
+    if (cheque.status === "CLEARED" || cheque.status === "BOUNCED") {
+      return { error: "Cheque status cannot be changed once cleared or bounced." }
+    }
+
+    const updateData: any = {
+      status,
+      clearedDate: status === "CLEARED" ? (clearedDate || new Date()) : null,
+      bouncedReason: status === "BOUNCED" ? bouncedReason : null,
+    }
+
+    if (status === "CLEARED") {
+      const ledgerEntryType = cheque.nature === "RECEIVED" ? "INCOME" : "EXPENSE"
+      const amount = cheque.nature === "RECEIVED" ? cheque.amount : -cheque.amount
+
+      await prisma.ledgerEntry.create({
+        data: {
+          accountId: cheque.accountId!,
+          date: clearedDate || new Date(),
+          type: ledgerEntryType,
+          amount: Math.abs(amount),
+          description: `Cheque ${cheque.chequeNumber} ${status.toLowerCase()} - ${cheque.partyName || "Unknown"}`,
+          referenceType: "CHEQUE",
+          referenceId: chequeId,
+        },
+      })
+    }
+
+    await prisma.chequeRegister.update({
+      where: { id: chequeId },
+      data: updateData,
+    })
+
+    revalidatePath("/dashboard/registers/cheques")
+    revalidatePath("/dashboard/bank")
+    revalidatePath("/dashboard/journal")
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update cheque status."
+    return { error: message }
+  }
+}
+
+export async function refreshPassbook(accountId?: string) {
+  try {
+    await requirePermission("registers", "read")
+    revalidatePath("/dashboard/bank")
+    revalidatePath("/dashboard/journal")
+    revalidatePath("/dashboard/registers/cheques")
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to refresh passbook."
+    return { error: message }
+  }
+}

@@ -226,3 +226,32 @@ export async function getExpenses() {
     take: 100,
   })
 }
+
+export async function markExpenseAsPaid(id: string) {
+  try {
+    await requirePermission("expenses", "approve")
+    const expense = await prisma.expense.findUnique({
+      where: { id },
+    })
+
+    if (!expense) {
+      return { error: "Expense not found." }
+    }
+
+    if (expense.status !== "APPROVED") {
+      return { error: "Only approved expenses can be marked as paid." }
+    }
+
+    await prisma.expense.update({
+      where: { id },
+      data: { status: "PAID" },
+    })
+
+    revalidatePath("/dashboard/expenses")
+    revalidatePath("/dashboard")
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to mark expense as paid."
+    return { error: message }
+  }
+}

@@ -24,8 +24,25 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Calendar as CalendarIcon,
+} from "lucide-react";
+import {
   cancelUnusedChequeLeaf,
   createChequeBook,
+  updateChequeStatus,
+  refreshPassbook,
 } from "@/app/dashboard/registers/cheques/actions";
 
 type ChequeEntry = {
@@ -36,6 +53,8 @@ type ChequeEntry = {
   partyName?: string | null;
   status: "PENDING" | "CLEARED" | "BOUNCED" | "CANCELLED";
   amount: number;
+  clearedDate?: string | null;
+  bouncedReason?: string | null;
   account?: { name: string } | null;
   donation?: { receiptNo: string } | null;
   expense?: { title: string } | null;
@@ -61,6 +80,15 @@ export function ChequeRegisterClient({
   accounts: { id: string; name: string }[];
 }) {
   const [isPending, startTransition] = React.useTransition();
+  const [selectedCheque, setSelectedCheque] =
+    React.useState<ChequeEntry | null>(null);
+  const [dialogType, setDialogType] = React.useState<"clear" | "bounce" | null>(
+    null,
+  );
+  const [clearedDate, setClearedDate] = React.useState<string>(
+    format(new Date(), "yyyy-MM-dd"),
+  );
+  const [bouncedReason, setBouncedReason] = React.useState<string>("");
   const [form, setForm] = React.useState({
     accountId: "",
     bookNo: "",
@@ -101,13 +129,77 @@ export function ChequeRegisterClient({
     });
   }
 
+  function handleRefresh() {
+    startTransition(async () => {
+      const res = await refreshPassbook();
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Passbook refreshed.");
+      window.location.reload();
+    });
+  }
+
+  function handleStatusUpdate() {
+    if (!selectedCheque || !dialogType) return;
+
+    startTransition(async () => {
+      const date = dialogType === "clear" ? new Date(clearedDate) : undefined;
+      const reason = dialogType === "bounce" ? bouncedReason : undefined;
+
+      const res = await updateChequeStatus(
+        selectedCheque.id,
+        dialogType === "clear" ? "CLEARED" : "BOUNCED",
+        date,
+        reason,
+      );
+
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+
+      toast.success(
+        `Cheque ${dialogType === "clear" ? "cleared" : "marked as bounced"} successfully.`,
+      );
+      setSelectedCheque(null);
+      setDialogType(null);
+      setBouncedReason("");
+      window.location.reload();
+    });
+  }
+
+  function getStatusBadgeVariant(status: string) {
+    switch (status) {
+      case "CLEARED":
+        return "default";
+      case "BOUNCED":
+        return "destructive";
+      case "CANCELLED":
+        return "secondary";
+      default:
+        return "outline";
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Cheque Register</h1>
-        <p className="text-muted-foreground">
-          Track cheques and manage cheque-book leaves.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Cheque Register</h1>
+          <p className="text-muted-foreground">
+            Track cheques and manage cheque-book leaves.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleRefresh}
+          disabled={isPending}
+          className="gap-2"
+        >
+          <RefreshCw className="h-4 w-4" /> Refresh Passbook
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -227,8 +319,10 @@ export function ChequeRegisterClient({
                 <TableHead>Party</TableHead>
                 <TableHead>Account</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Cleared Date</TableHead>
                 <TableHead>Reference</TableHead>
                 <TableHead className="text-right">Amount (₹)</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -252,13 +346,14 @@ export function ChequeRegisterClient({
                   <TableCell>{cheque.partyName || "-"}</TableCell>
                   <TableCell>{cheque.account?.name || "-"}</TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        cheque.status === "CLEARED" ? "default" : "outline"
-                      }
-                    >
+                    <Badge variant={getStatusBadgeVariant(cheque.status)}>
                       {cheque.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {cheque.clearedDate
+                      ? format(new Date(cheque.clearedDate), "dd MMM yyyy")
+                      : cheque.bouncedReason || "-"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {cheque.donation?.receiptNo || cheque.expense?.title || "-"}
@@ -267,6 +362,38 @@ export function ChequeRegisterClient({
                     {cheque.amount.toLocaleString("en-IN", {
                       minimumFractionDigits: 2,
                     })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {cheque.status === "PENDING" && (
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 text-green-600 hover:text-green-700"
+                          onClick={() => {
+                            setSelectedCheque(cheque);
+                            setDialogType("clear");
+                            setClearedDate(format(new Date(), "yyyy-MM-dd"));
+                          }}
+                          disabled={isPending}
+                        >
+                          <CheckCircle2 className="h-4 w-4" /> Clear
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 text-red-600 hover:text-red-700"
+                          onClick={() => {
+                            setSelectedCheque(cheque);
+                            setDialogType("bounce");
+                            setBouncedReason("");
+                          }}
+                          disabled={isPending}
+                        >
+                          <XCircle className="h-4 w-4" /> Bounce
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -342,6 +469,99 @@ export function ChequeRegisterClient({
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={!!dialogType}
+        onOpenChange={(open) =>
+          !open && (setDialogType(null), setSelectedCheque(null))
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {dialogType === "clear"
+                ? "Clear Cheque"
+                : "Mark Cheque as Bounced"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {selectedCheque && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Cheque No.:</span>
+                    <span className="ml-2 font-medium">
+                      {selectedCheque.chequeNumber}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Amount:</span>
+                    <span className="ml-2 font-medium">
+                      ₹
+                      {selectedCheque.amount.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Party:</span>
+                    <span className="ml-2 font-medium">
+                      {selectedCheque.partyName || "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Nature:</span>
+                    <span className="ml-2 font-medium">
+                      {selectedCheque.nature}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {dialogType === "clear" ? (
+              <div className="space-y-2">
+                <Label>Cleared Date</Label>
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={clearedDate}
+                    onChange={(e) => setClearedDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Bounce Reason</Label>
+                <Textarea
+                  placeholder="Enter reason for cheque bounce..."
+                  value={bouncedReason}
+                  onChange={(e) => setBouncedReason(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => (setDialogType(null), setSelectedCheque(null))}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleStatusUpdate}
+              disabled={
+                isPending || (dialogType === "bounce" && !bouncedReason.trim())
+              }
+              variant={dialogType === "clear" ? "default" : "destructive"}
+            >
+              {dialogType === "clear" ? "Clear Cheque" : "Mark as Bounced"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
