@@ -21,7 +21,7 @@ const donationSchema = z.object({
   mobileNumber: z.string().optional(),
   address: z.string().optional(),
   category: z.string(),
-  amount: z.coerce.number().min(1, "Amount is required"),
+  amount: z.number({ error: "Amount is required" }).min(1, "Amount must be positive"),
   paymentMode: z.string(),
   transactionId: z.string().optional(),
   chequeNumber: z.string().optional(),
@@ -139,7 +139,11 @@ export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId
         </div>
         <div className="space-y-2">
           <Label>Amount (₹) *</Label>
-          <Input type="number" step="0.01" {...register("amount")} />
+          <Input
+            type="number"
+            step="0.01"
+            {...register("amount", { valueAsNumber: true })}
+          />
           {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
         </div>
       </div>
