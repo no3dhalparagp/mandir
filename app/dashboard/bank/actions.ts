@@ -48,6 +48,50 @@ const debitTypes: LedgerTransactionType[] =
     "TRANSFER_OUT",
   ]
 
+export async function getAccountBalance(
+  accountId: string
+) {
+  const entries =
+    await prisma.ledgerEntry.findMany({
+      where: {
+        accountId,
+
+        OR: [
+          {
+            isCleared: true,
+          },
+          {
+            isCleared: null,
+          },
+        ],
+      },
+
+      orderBy: [
+        {
+          date: "asc",
+        },
+        {
+          createdAt: "asc",
+        },
+      ],
+    })
+
+  let balance = 0
+
+  for (const entry of entries) {
+    const isDebit = [
+      "EXPENSE",
+      "TRANSFER_OUT",
+    ].includes(entry.type)
+
+    balance = isDebit
+      ? balance - Number(entry.amount)
+      : balance + Number(entry.amount)
+  }
+
+  return balance
+}
+
 /* ======================================================
    RECALCULATE RUNNING BALANCE
 ====================================================== */
