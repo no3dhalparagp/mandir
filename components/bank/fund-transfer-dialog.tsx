@@ -16,7 +16,7 @@ import { createFundTransfer } from "@/app/dashboard/bank/transfers/actions"
 const schema = z.object({
   fromAccountId: z.string().min(1, "Select source account"),
   toAccountId: z.string().min(1, "Select target account"),
-  amount: z.number({ invalid_type_error: "Amount is required" }).min(1, "Minimum 1"),
+  amount: z.number({ error: "Amount is required" }).min(1, "Minimum 1"),
   referenceNo: z.string().optional(),
   notes: z.string().optional(),
 })
