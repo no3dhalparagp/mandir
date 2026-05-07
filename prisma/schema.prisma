@@ -545,8 +545,7 @@ model Event {
 // ─── Ledger ───────────────────────────────────────────────────────────────────
 
 model LedgerEntry {
-  id              String   @id @default(cuid())
-
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   accountId       String
 
   account         BankAccount @relation(fields: [accountId], references: [id])
