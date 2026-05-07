@@ -1,3 +1,5 @@
+// File: app/dashboard/collections/page.tsx
+
 import { getAllCollections } from "./actions"
 import { getBankAccounts } from "@/app/dashboard/bank/actions"
 
@@ -61,25 +63,24 @@ export default async function CollectionsPage() {
       "ACCOUNTANT",
     ].includes(user.role)
 
-  /* ---------------------------------------------------------------------- */
-  /*                              Collections                               */
-  /* ---------------------------------------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /*                                 Collections                                */
+  /* -------------------------------------------------------------------------- */
 
   const collections =
     await getAllCollections()
 
-  /* ---------------------------------------------------------------------- */
-  /*                            Bank Accounts                               */
-  /* ---------------------------------------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /*                               Bank Accounts                                */
+  /* -------------------------------------------------------------------------- */
 
-  // Only admin/accountant can load bank accounts
   const accounts = isAdminOrAccountant
     ? await getBankAccounts()
     : []
 
-  /* ---------------------------------------------------------------------- */
-  /*                               Statistics                               */
-  /* ---------------------------------------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /*                                  Summary                                   */
+  /* -------------------------------------------------------------------------- */
 
   const pending = collections.filter((c) =>
     ["COLLECTED", "DEPOSITED"].includes(
@@ -95,13 +96,11 @@ export default async function CollectionsPage() {
     (c) => c.status === "DISCREPANT"
   )
 
-  // Pending amount
   const totalPending = pending.reduce(
     (s, c) => s + c.collectedAmount,
     0
   )
 
-  // Verified amount only
   const totalVerified = verified.reduce(
     (s, c) =>
       s +
@@ -110,7 +109,6 @@ export default async function CollectionsPage() {
     0
   )
 
-  // Recovery/recollection amount
   const recollectionRequired =
     discrepant.reduce((s, c) => {
       const verified =
@@ -124,9 +122,9 @@ export default async function CollectionsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ------------------------------------------------------------------ */}
-      {/* Header                                                             */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* Header                                                                 */}
+      {/* ---------------------------------------------------------------------- */}
 
       <div>
         <h1 className="text-3xl font-bold tracking-tight">
@@ -136,13 +134,14 @@ export default async function CollectionsPage() {
         </h1>
 
         <p className="text-muted-foreground">
-          Collection and deposit tracking.
+          Collection, verification and
+          recollection tracking.
         </p>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Summary Cards                                                      */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* Summary Cards                                                          */}
+      {/* ---------------------------------------------------------------------- */}
 
       <div className="grid gap-4 md:grid-cols-3">
         {/* Pending */}
@@ -224,9 +223,9 @@ export default async function CollectionsPage() {
         </Card>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Table                                                              */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* Table                                                                  */}
+      {/* ---------------------------------------------------------------------- */}
 
       <Card>
         <CardHeader>
@@ -390,7 +389,7 @@ export default async function CollectionsPage() {
                         )}
                       </TableCell>
 
-                      {/* Deposited */}
+                      {/* Deposited To */}
 
                       <TableCell className="text-sm text-muted-foreground">
                         {c
@@ -454,6 +453,24 @@ export default async function CollectionsPage() {
                                 collectedAmount={
                                   c.collectedAmount
                                 }
+                              />
+                            </div>
+                          )}
+
+                        {/* Recollect */}
+
+                        {isAdminOrAccountant &&
+                          c.status ===
+                            "DISCREPANT" && (
+                            <div className="ml-2 inline-block">
+                              <DepositCollectionButton
+                                collectionId={
+                                  c.id
+                                }
+                                accounts={
+                                  accounts
+                                }
+                                recollectMode
                               />
                             </div>
                           )}
