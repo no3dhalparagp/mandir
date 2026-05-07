@@ -144,7 +144,7 @@ export function DepositCashDialog({
             <Label>From Cash Account *</Label>
 
             <Select
-              onValueChange={(v: string) => {
+              onValueChange={(v: string | null) => {
                 if (v) {
                   setValue("fromAccountId", v)
                 }
@@ -189,7 +189,7 @@ export function DepositCashDialog({
             <Label>Deposit To Bank Account *</Label>
 
             <Select
-              onValueChange={(v: string) => {
+              onValueChange={(v: string | null) => {
                 if (v) {
                   setValue("toAccountId", v)
                 }
