@@ -22,6 +22,8 @@ import {
   BookOpen,
   ScrollText,
   Lock,
+  User,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -99,6 +101,11 @@ const navGroups: NavGroup[] = [
         icon: Building2,
       },
       {
+        title: "Deposit Verification",
+        url: "/dashboard/deposits",
+        icon: CheckCircle2,
+      },
+      {
         title: "Chart of Accounts",
         url: "/dashboard/coa",
         icon: BookOpen,
@@ -167,6 +174,12 @@ const navGroups: NavGroup[] = [
         url: "/dashboard/registers/assets",
         icon: Landmark,
       },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { title: "My Profile", url: "/dashboard/profile", icon: User },
     ],
   },
   {

@@ -164,6 +164,16 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Security fields
+  lastLoginAt      DateTime?
+  lastLoginIp      String?
+  lastLoginDevice  String?
+  loginAttempts    Int       @default(0)
+  lockedUntil      DateTime?
+  passwordChangedAt DateTime?
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?
+
   approvedExpenses       Expense[]               @relation("ApprovedExpenses")
   verifiedCollections    MemberCollection[]      @relation("VerifiedCollections")
   reconciliations        BankReconciliation[]    @relation("ReconciledBy")
@@ -171,6 +181,8 @@ model User {
   accountingTransactions AccountingTransaction[]
   bookClosures           BookClosure[]           @relation("BookClosedBy")
   auditLogs              AuditLog[]
+  loginHistories         LoginHistory[]
+  activeSessions         ActiveSession[]
 }
 
 // ─── Chart of Accounts ─────────────────────────────────────────────────────────
@@ -253,6 +265,8 @@ model BankAccount {
   assets          AssetRegister[]
   chequeBooks     ChequeBook[]
   chequeLeaves    ChequeBookLeaf[]
+  bankPassbooks   BankPassbook[]
+  depositVerifications DepositVerification[]
 }
 
 // ─── Fund Transfer between accounts ──────────────────────────────────────────
@@ -294,6 +308,8 @@ model Member {
 
   collections MemberCollection[]
   donations   Donation[]         @relation("CollectedByMember")
+  memberAccount MemberAccount?
+  depositVerifications DepositVerification[]
 }
 
 // ─── Donations ────────────────────────────────────────────────────────────────
@@ -625,4 +641,150 @@ model BookClosure {
 
   @@unique([closureType, periodStart, periodEnd])
   @@index([periodStart, periodEnd])
+}
+
+// ─── Login History ────────────────────────────────────────────────────────────
+
+model LoginHistory {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String
+  device    String?
+  userAgent String?
+  success   Boolean  @default(true)
+  reason    String?  // For failed attempts
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ─── Active Session ───────────────────────────────────────────────────────────
+
+model ActiveSession {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  ipAddress String
+  device    String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  lastActivityAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─── User Invite ──────────────────────────────────────────────────────────────
+
+model UserInvite {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  role      Role     @default(VIEWER)
+  token     String   @unique
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+// ─── Member Account & Passbook ────────────────────────────────────────────────
+
+model MemberAccount {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  memberId          String   @unique @db.ObjectId
+  member            Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  openingBalance    Float    @default(0)
+  currentBalance    Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  passbooks         Passbook[]
+}
+
+model Passbook {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  date              DateTime
+  description       String
+  referenceType     String?  // "DONATION", "EXPENSE", "TRANSFER", "MEMBER_DEPOSIT"
+  referenceId       String?
+  debit             Float    @default(0)  // Money going out
+  credit            Float    @default(0) // Money coming in
+  balance           Float
+  createdAt         DateTime @default(now())
+
+  memberAccountId   String   @db.ObjectId
+  memberAccount     MemberAccount @relation(fields: [memberAccountId], references: [id], onDelete: Cascade)
+
+  @@index([memberAccountId])
+  @@index([date])
+  @@index([createdAt])
+}
+
+// ─── Bank Passbook ────────────────────────────────────────────────────────────
+
+model BankPassbook {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  date              DateTime
+  description       String
+  referenceType     String   // "DONATION", "DEPOSIT", "WITHDRAWAL", "TRANSFER_IN", "TRANSFER_OUT", "EXPENSE"
+  referenceId       String?
+  debit             Float    @default(0)  // Money going out
+  credit            Float    @default(0) // Money coming in
+  balance           Float
+  isVerified        Boolean  @default(false)
+  verifiedAt        DateTime?
+  verifiedBy        String?  @db.ObjectId // User ID
+  createdAt         DateTime @default(now())
+
+  bankAccountId     String   @db.ObjectId
+  bankAccount       BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  @@index([bankAccountId])
+  @@index([date])
+  @@index([isVerified])
+  @@index([createdAt])
+}
+
+// ─── Deposit Verification ─────────────────────────────────────────────────────
+
+model DepositVerification {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  depositAmount     Float
+  depositDate       DateTime
+  status            String   @default("PENDING") // "PENDING", "VERIFIED", "REJECTED", "RECONCILED"
+  
+  collectedByName   String?  // Member name who collected
+  collectedMemberId String?  @db.ObjectId
+  member            Member?  @relation(fields: [collectedMemberId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  bankAccountId     String   @db.ObjectId
+  bankAccount       BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  
+  receiptNo         String?
+  notes             String?
+  
+  verifiedAt        DateTime?
+  verifiedBy        String?  @db.ObjectId // User ID
+  rejectionReason   String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([bankAccountId])
+  @@index([status])
+  @@index([depositDate])
+  @@index([collectedMemberId])
+}
+
+enum DepositStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  RECONCILED
 }

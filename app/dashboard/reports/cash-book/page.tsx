@@ -67,6 +67,8 @@ export default async function CashBookReportPage({
     return { ...e, isDebit, balance: runningBal }
   })
 
+  const closingBalance = reportRows.length > 0 ? reportRows[reportRows.length - 1].balance : openingBalance
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -176,7 +178,7 @@ export default async function CashBookReportPage({
                 <TableCell></TableCell>
                 <TableCell></TableCell>
                 <TableCell className="text-right text-primary text-lg">
-                  
+                  {closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </TableCell>
               </TableRow>
             </TableBody>

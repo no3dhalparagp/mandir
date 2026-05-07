@@ -505,7 +505,7 @@ export function ReconciliationWizard({
                   </FormLabel>
 
                   <Popover>
-                    <PopoverTrigger asChild>
+                    <PopoverTrigger>
                       <FormControl>
                         <Button
                           variant="outline"
@@ -559,7 +559,7 @@ export function ReconciliationWizard({
                   </FormLabel>
 
                   <Popover>
-                    <PopoverTrigger asChild>
+                    <PopoverTrigger>
                       <FormControl>
                         <Button
                           variant="outline"

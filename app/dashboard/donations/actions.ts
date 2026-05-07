@@ -99,6 +99,50 @@ export async function createDonation(data: z.infer<typeof donationSchema>) {
           collectedAmount: donation.amount,
         },
       })
+
+      // Create or get member account
+      let memberAccount = await prisma.memberAccount.findUnique({
+        where: { memberId: validatedData.collectedByMemberId },
+      })
+
+      if (!memberAccount) {
+        memberAccount = await prisma.memberAccount.create({
+          data: {
+            memberId: validatedData.collectedByMemberId,
+            openingBalance: 0,
+            currentBalance: 0,
+          },
+        })
+      }
+
+      // Get previous balance for passbook entry
+      const lastEntry = await prisma.passbook.findFirst({
+        where: { memberAccountId: memberAccount.id },
+        orderBy: { date: "desc" },
+      })
+
+      const previousBalance = lastEntry?.balance || memberAccount.openingBalance
+      const newBalance = previousBalance + donation.amount
+
+      // Create passbook entry
+      await prisma.passbook.create({
+        data: {
+          memberAccountId: memberAccount.id,
+          date: new Date(),
+          description: `Donation collected - ${donation.donorName} (${donation.category})`,
+          referenceType: "DONATION",
+          referenceId: donation.id,
+          credit: donation.amount,
+          debit: 0,
+          balance: newBalance,
+        },
+      })
+
+      // Update member account balance
+      await prisma.memberAccount.update({
+        where: { id: memberAccount.id },
+        data: { currentBalance: newBalance },
+      })
     }
 
     if (validatedData.accountId && !validatedData.collectedByMemberId) {
