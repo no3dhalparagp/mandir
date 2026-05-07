@@ -14,6 +14,7 @@ import {
   IndianRupee,
   Wallet,
   Lock,
+  BookOpen,
 } from "lucide-react";
 
 export default async function ReportsPage() {
@@ -70,6 +71,13 @@ export default async function ReportsPage() {
         "Subsidiary ledger view for specific cash and bank accounts.",
       href: "/dashboard/reports/cash-book",
       icon: IndianRupee,
+    },
+    {
+      title: "Member Passbook",
+      description:
+        "Track individual member account transactions and balance history.",
+      href: "/dashboard/reports/passbook",
+      icon: BookOpen,
     },
   ];
 
