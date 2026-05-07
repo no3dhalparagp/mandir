@@ -1,4 +1,3 @@
-
 "use server"
 
 import { prisma } from "@/lib/prisma"
@@ -108,15 +107,6 @@ export async function getAccountBalance(
     await prisma.ledgerEntry.findMany({
       where: {
         accountId,
-
-        OR: [
-          {
-            isCleared: true,
-          },
-          {
-            isCleared: null,
-          },
-        ],
       },
 
       orderBy: [
@@ -492,4 +482,3 @@ export async function getBankAccounts() {
     },
   })
 }
-
