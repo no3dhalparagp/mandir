@@ -98,6 +98,11 @@ export async function seedDefaultChartOfAccounts() {
     { code: "1100", name: "Cash & Bank", type: "ASSET", parentCode: "1000" },
     { code: "1101", name: "Cash in Hand", type: "ASSET", parentCode: "1100" },
     { code: "1102", name: "SBI Savings Account", type: "ASSET", parentCode: "1100" },
+    { code: "1200", name: "Cheque in Hand", type: "ASSET", parentCode: "1000" },
+    { code: "1300", name: "Fixed Assets", type: "ASSET", parentCode: "1000" },
+    { code: "1310", name: "Temple Building", type: "ASSET", parentCode: "1300" },
+    { code: "1320", name: "Furniture & Fixtures", type: "ASSET", parentCode: "1300" },
+    { code: "1330", name: "Office Equipment", type: "ASSET", parentCode: "1300" },
     { code: "2000", name: "Liabilities", type: "LIABILITY" },
     { code: "3000", name: "Equity", type: "EQUITY" },
     { code: "4000", name: "Income", type: "INCOME" },
@@ -124,4 +129,56 @@ export async function seedDefaultChartOfAccounts() {
     })
     parentMap.set(acc.code, created.id)
   }
+}
+
+export async function generateAssetCode(prefix = "AST"): Promise<string> {
+  const currentYear = new Date().getFullYear()
+  const yearPrefix = `${prefix}-${currentYear}`
+  const count = await prisma.assetRegister.count({
+    where: {
+      assetCode: {
+        startsWith: yearPrefix,
+      },
+    },
+  })
+  return `${yearPrefix}-${String(count + 1).padStart(4, "0")}`
+}
+
+interface CreateAssetInput {
+  name: string
+  category: string
+  purchaseDate: Date
+  purchaseValue: number
+  residualValue?: number
+  usefulLifeYears?: number
+  depreciationMethod?: "STRAIGHT_LINE" | "WRITTEN_DOWN_VALUE"
+  purchaseAccountId?: string
+  location?: string
+  custodian?: string
+  vendorName?: string
+  invoiceNumber?: string
+  notes?: string
+}
+
+export async function createAssetRecord(input: CreateAssetInput) {
+  const assetCode = await generateAssetCode()
+  return prisma.assetRegister.create({
+    data: {
+      assetCode,
+      name: input.name,
+      category: input.category,
+      purchaseDate: input.purchaseDate,
+      purchaseValue: input.purchaseValue,
+      residualValue: input.residualValue ?? 0,
+      usefulLifeYears: input.usefulLifeYears,
+      depreciationMethod: input.depreciationMethod ?? "STRAIGHT_LINE",
+      purchaseAccountId: input.purchaseAccountId,
+      location: input.location,
+      custodian: input.custodian,
+      vendorName: input.vendorName,
+      invoiceNumber: input.invoiceNumber,
+      currentBookValue: input.purchaseValue,
+      notes: input.notes,
+    },
+  })
 }

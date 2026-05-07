@@ -38,12 +38,14 @@ interface Props {
   }[]
 
   recollectMode?: boolean
+  recollectAmount?: number
 }
 
 export function DepositCollectionButton({
   collectionId,
   accounts,
   recollectMode = false,
+  recollectAmount,
 }: Props) {
   const [open, setOpen] =
     useState(false)
@@ -73,7 +75,8 @@ export function DepositCollectionButton({
         await markCollectionDeposited(
           collectionId,
           accountId,
-          depositSlipNo
+          depositSlipNo,
+          recollectMode
         )
 
       if (result?.success) {
@@ -126,6 +129,18 @@ export function DepositCollectionButton({
         </DialogHeader>
 
         <div className="space-y-4">
+          {recollectMode && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              Remaining amount to recollect:{" "}
+              <span className="font-semibold">
+                ₹
+                {(recollectAmount ?? 0).toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+          )}
+
           {/* ============================================
               ACCOUNT SELECT
           ============================================ */}

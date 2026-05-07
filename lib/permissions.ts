@@ -47,6 +47,16 @@ export const PERMISSIONS = {
   reports: {
     read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
   },
+  registers: {
+    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
+    manage: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
+  },
+  assets: {
+    create: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
+    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
+    edit: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
+    dispose: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
+  },
   users: {
     create: ["SUPER_ADMIN"],
     read: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],

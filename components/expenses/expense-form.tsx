@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Checkbox } from "@/components/ui/checkbox"
 import { createExpense } from "@/app/dashboard/expenses/actions"
 
 // Exact list of payment modes – matches the Prisma/PaymentMode enum
@@ -41,6 +42,15 @@ const expenseSchema = z.object({
   transactionId: z.string().optional(),
   billNumber: z.string().optional(),
   accountId: z.string().optional(),
+  chequeLeafId: z.string().optional(),
+  isAssetPurchase: z.boolean().optional(),
+  assetName: z.string().optional(),
+  assetCategory: z.string().optional(),
+  assetUsefulLifeYears: z.preprocess(
+    (value) => (value === "" || Number.isNaN(value) ? undefined : value),
+    z.number().int().positive().optional()
+  ),
+  assetLocation: z.string().optional(),
   notes: z.string().optional(),
 })
 
@@ -49,15 +59,17 @@ type ExpenseFormData = z.infer<typeof expenseSchema>
 interface ExpenseFormProps {
   onSuccess: () => void
   accounts: { id: string; name: string }[]
+  chequeLeaves: { id: string; chequeNumber: string; accountId: string; account: { name: string } }[]
 }
 
-export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
+export function ExpenseForm({ onSuccess, accounts, chequeLeaves }: ExpenseFormProps) {
   const [isPending, startTransition] = React.useTransition()
   const [paymentMode, setPaymentMode] = React.useState("CASH")
+  const [isAssetPurchase, setIsAssetPurchase] = React.useState(false)
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
-    defaultValues: { category: "MISC", paymentMode: "CASH" },
+    defaultValues: { category: "MISC", paymentMode: "CASH", isAssetPurchase: false },
   })
 
   function onSubmit(data: ExpenseFormData) {
@@ -162,7 +174,22 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
       </div>
 
       {showCheque && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-2">
+            <Label>Use from Cheque Book (optional)</Label>
+            <Select onValueChange={(v) => setValue("chequeLeafId", v === "__manual" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Pick unused cheque leaf" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__manual">Manual entry</SelectItem>
+                {chequeLeaves.map((leaf) => (
+                  <SelectItem key={leaf.id} value={leaf.id}>
+                    {leaf.chequeNumber} - {leaf.account.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Cheque No.</Label>
             <Input {...register("chequeNumber")} />
@@ -170,6 +197,7 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
           <div className="space-y-2">
             <Label>Cheque Date</Label>
             <Input type="date" {...register("chequeDate")} />
+          </div>
           </div>
         </div>
       )}
@@ -184,6 +212,39 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
         <Label>Notes</Label>
         <Input {...register("notes")} />
       </div>
+
+      <Separator />
+      <div className="flex items-center gap-2">
+        <Checkbox
+          checked={isAssetPurchase}
+          onCheckedChange={(checked) => {
+            const value = checked === true
+            setIsAssetPurchase(value)
+            setValue("isAssetPurchase", value)
+          }}
+        />
+        <Label>This expense creates a fixed asset entry</Label>
+      </div>
+      {isAssetPurchase && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Asset Name</Label>
+            <Input {...register("assetName")} placeholder="Defaults to expense title" />
+          </div>
+          <div className="space-y-2">
+            <Label>Asset Category</Label>
+            <Input {...register("assetCategory")} placeholder="Defaults to expense category" />
+          </div>
+          <div className="space-y-2">
+            <Label>Useful Life (Years)</Label>
+            <Input type="number" {...register("assetUsefulLifeYears", { valueAsNumber: true })} />
+          </div>
+          <div className="space-y-2">
+            <Label>Asset Location</Label>
+            <Input {...register("assetLocation")} />
+          </div>
+        </div>
+      )}
 
       <Button className="w-full" type="submit" disabled={isPending}>
         {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

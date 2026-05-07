@@ -3,8 +3,12 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
+import { AccountType } from "@prisma/client"
 
-import { getAccountBalance } from "@/app/dashboard/bank/actions"
+import {
+  getAccountBalance,
+  addVerifiedCollectionToCashAccount,
+} from "@/app/dashboard/bank/actions"
 
 import {
   requirePermission,
@@ -63,7 +67,7 @@ export async function getAllCollections() {
 
   const session = await auth()
 
-  let whereClause = {}
+  let whereClause: any = {}
 
   if (session?.user?.id) {
     const user = await prisma.user.findUnique({
@@ -83,7 +87,7 @@ export async function getAllCollections() {
     }
   }
 
-  return prisma.memberCollection.findMany({
+  const collections = await prisma.memberCollection.findMany({
     where: whereClause,
     include: {
       member: true,
@@ -94,6 +98,45 @@ export async function getAllCollections() {
     orderBy: { collectedDate: "desc" },
     take: 100,
   })
+
+  if (collections.length === 0) {
+    return collections
+  }
+
+  // Determine which verified collections already have a cash-account ledger entry
+  const collectionIds = collections.map((c) => c.id)
+
+  const cashAccounts = await prisma.bankAccount.findMany({
+    where: { accountType: AccountType.CASH_IN_HAND },
+    select: { id: true },
+  })
+
+  const cashAccountIds = cashAccounts.map((a) => a.id)
+
+  let cashPostedIds = new Set<string>()
+
+  if (cashAccountIds.length > 0) {
+    const cashLedgerEntries = await prisma.ledgerEntry.findMany({
+      where: {
+        accountId: { in: cashAccountIds },
+        referenceType: "OTHER",
+        referenceId: { in: collectionIds },
+      },
+      select: { referenceId: true },
+    })
+
+    cashPostedIds = new Set(
+      cashLedgerEntries
+        .map((e) => e.referenceId)
+        .filter((id): id is string => !!id)
+    )
+  }
+
+  return collections.map((c) => ({
+    ...c,
+    isInCashAccount: cashPostedIds.has(c.id),
+    canSendToCash: !!session?.user?.id && c.verifiedById === session.user.id,
+  }))
 }
 
 /* -------------------------------------------------------------------------- */
@@ -168,10 +211,54 @@ export async function getMemberLedger(memberId: string) {
 export async function markCollectionDeposited(
   collectionId: string,
   depositedToAccountId: string,
-  depositSlipNo?: string
+  depositSlipNo?: string,
+  recollectMode?: boolean
 ) {
   try {
     await requirePermission("collections", "deposit")
+
+    if (recollectMode) {
+      const existing = await prisma.memberCollection.findUnique({
+        where: { id: collectionId },
+      })
+
+      if (!existing) {
+        return { error: "Collection not found." }
+      }
+
+      if (existing.status !== "DISCREPANT") {
+        return {
+          error: "Only discrepant collections can be submitted as recollection.",
+        }
+      }
+
+      const remainingAmount = Math.max(
+        0,
+        existing.collectedAmount - (existing.verifiedAmount ?? 0)
+      )
+
+      if (remainingAmount <= 0) {
+        return { error: "No remaining amount pending for recollection." }
+      }
+
+      await prisma.memberCollection.update({
+        where: { id: collectionId },
+        data: {
+          collectedAmount: remainingAmount,
+          status: "DEPOSITED",
+          depositedToAccountId,
+          depositedDate: new Date(),
+          depositSlipNo,
+          verifiedAmount: null,
+          verifiedById: null,
+          verifiedAt: null,
+          discrepancyNote: null,
+        },
+      })
+
+      revalidatePath("/dashboard/collections")
+      return { success: true }
+    }
 
     await prisma.memberCollection.update({
       where: { id: collectionId },
@@ -208,6 +295,7 @@ export async function verifyCollection(
     const collection = await prisma.memberCollection.findUnique({
       where: { id: collectionId },
       include: {
+        member: true,
         donation: { include: { account: true } },
         depositedToAccount: true,
       },
@@ -230,48 +318,38 @@ export async function verifyCollection(
       },
     })
 
-    const targetAccountId =
-      collection.depositedToAccountId ?? collection.donation.accountId
-
-    const targetAccountName =
-      collection.depositedToAccount?.name ?? collection.donation.account?.name
-
     /* ---------------------------------------------------------------------- */
-    /*                         Create Ledger Entry                            */
+    /*                           Post To Cash Account                         */
     /* ---------------------------------------------------------------------- */
 
-    if (!hasDiscrepancy && targetAccountId) {
-      const existingEntry = await prisma.ledgerEntry.findFirst({
-        where: {
-          referenceType: "MEMBER_COLLECTION",
-          referenceId: collectionId,
-        },
-      })
-
-      if (!existingEntry) {
-        await prisma.ledgerEntry.create({
-          data: {
-            accountId: targetAccountId,
-            type: "MEMBER_DEPOSIT",
-            amount: verifiedAmount,
-            description: `Collection by member - Donation: ${collection.donation.receiptNo}`,
-            referenceType: "MEMBER_COLLECTION",
-            referenceId: collectionId,
-          },
-        })
-
-        await recalculateBalancesForAccount(targetAccountId)
-      }
-    }
-
-    /* ---------------------------------------------------------------------- */
-    /*                            Updated Balance                             */
-    /* ---------------------------------------------------------------------- */
-
+    let targetAccountId: string | undefined
+    let targetAccountName: string | undefined
     let currentBalance = undefined
 
-    if (!hasDiscrepancy && targetAccountId) {
-      currentBalance = await getAccountBalance(targetAccountId)
+    if (!hasDiscrepancy) {
+      // Find default cash-in-hand account
+      const cashAccount = await prisma.bankAccount.findFirst({
+        where: { accountType: AccountType.CASH_IN_HAND },
+      })
+
+      if (!cashAccount) {
+        return {
+          error:
+            "No Cash in Hand account found. Please create one under Bank Accounts first.",
+        }
+      }
+
+      await addVerifiedCollectionToCashAccount({
+        cashAccountId: cashAccount.id,
+        amount: verifiedAmount,
+        collectionId,
+        collectorName: collection.member?.name ?? undefined,
+      })
+
+      targetAccountId = cashAccount.id
+      targetAccountName = cashAccount.name
+
+      currentBalance = await getAccountBalance(cashAccount.id)
     }
 
     revalidatePath("/dashboard/collections")
@@ -281,7 +359,7 @@ export async function verifyCollection(
     return {
       success: true,
       balance: currentBalance,
-      accountName: targetAccountName ?? undefined,
+      accountName: targetAccountName,
     }
   } catch (error: any) {
     return {

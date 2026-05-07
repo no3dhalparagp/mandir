@@ -9,7 +9,7 @@ import {
   LedgerTransactionType,
 } from "@prisma/client"
 
-import { requirePermission } from "@/lib/authorization"
+import { requireAuth, requirePermission } from "@/lib/authorization"
 
 /* ======================================================
    SCHEMA
@@ -321,4 +321,121 @@ export async function getAccountBalance(accountId: string) {
   })
 
   return lastEntry?.runningBalance ?? 0
+}
+
+/* ======================================================
+   BULK: ADD VERIFIED COLLECTIONS TO CASH ACCOUNT
+====================================================== */
+
+export async function bulkAddVerifiedCollectionsToCashAccount({
+  cashAccountId,
+  collectionIds,
+}: {
+  cashAccountId: string
+  collectionIds: string[]
+}) {
+  try {
+    const currentUser = await requireAuth()
+    await requirePermission("bank", "transfer")
+    await requirePermission("collections", "deposit")
+
+    if (collectionIds.length === 0) {
+      return { success: true }
+    }
+
+    // Ensure target is a cash-in-hand account
+    const cashAccount = await prisma.bankAccount.findFirst({
+      where: {
+        id: cashAccountId,
+        accountType: AccountType.CASH_IN_HAND,
+      },
+    })
+
+    if (!cashAccount) {
+      return {
+        error:
+          "Selected account is not a Cash in Hand account or does not exist.",
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const collections = await tx.memberCollection.findMany({
+        where: {
+          id: { in: collectionIds },
+          status: "VERIFIED",
+          verifiedById: currentUser.id,
+        },
+        include: {
+          member: true,
+        },
+      })
+
+      if (collections.length === 0) {
+        throw new Error(
+          "Only the same user who verified a collection can send it to cash account."
+        )
+      }
+
+      // Find existing cash ledger entries for these collections to avoid duplicates
+      const cashAccountIds = await tx.bankAccount.findMany({
+        where: { accountType: AccountType.CASH_IN_HAND },
+        select: { id: true },
+      })
+
+      const existingEntries = await tx.ledgerEntry.findMany({
+        where: {
+          accountId: { in: cashAccountIds.map((a) => a.id) },
+          referenceType: "OTHER",
+          referenceId: { in: collections.map((c) => c.id) },
+        },
+        select: { referenceId: true },
+      })
+
+      const alreadyPosted = new Set(
+        existingEntries
+          .map((e) => e.referenceId)
+          .filter((id): id is string => !!id)
+      )
+
+      for (const collection of collections) {
+        if (alreadyPosted.has(collection.id)) {
+          continue
+        }
+
+        const amount =
+          typeof collection.verifiedAmount === "number"
+            ? collection.verifiedAmount
+            : collection.collectedAmount
+
+        await tx.ledgerEntry.create({
+          data: {
+            accountId: cashAccountId,
+            type: "INCOME",
+            amount: Number(amount),
+            description: `Verified collection${
+              collection.member?.name ? ` from ${collection.member.name}` : ""
+            }`,
+            referenceId: collection.id,
+            referenceType: "OTHER",
+          },
+        })
+      }
+
+      await recalculateRunningBalances(cashAccountId)
+    })
+
+    revalidatePath("/dashboard/bank")
+    revalidatePath("/dashboard/collections")
+
+    return { success: true }
+  } catch (error) {
+    console.error(error)
+
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to add collections to cash account",
+    }
+  }
 }

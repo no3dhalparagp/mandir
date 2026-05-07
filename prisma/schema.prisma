@@ -118,6 +118,35 @@ enum EntryType {
   CREDIT
 }
 
+enum ChequeNature {
+  RECEIVED
+  ISSUED
+}
+
+enum ChequeStatus {
+  PENDING
+  CLEARED
+  BOUNCED
+  CANCELLED
+}
+
+enum AssetStatus {
+  ACTIVE
+  UNDER_MAINTENANCE
+  DISPOSED
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+  WRITTEN_DOWN_VALUE
+}
+
+enum ChequeLeafStatus {
+  UNUSED
+  ISSUED
+  CANCELLED
+}
+
 // ─── Core User ────────────────────────────────────────────────────────────────
 
 model User {
@@ -213,6 +242,10 @@ model BankAccount {
   transfersTo     FundTransfer[]       @relation("TransferTo")
   collections     MemberCollection[]
   reconciliations BankReconciliation[]
+  chequeEntries   ChequeRegister[]
+  assets          AssetRegister[]
+  chequeBooks     ChequeBook[]
+  chequeLeaves    ChequeBookLeaf[]
 }
 
 // ─── Fund Transfer between accounts ──────────────────────────────────────────
@@ -287,6 +320,7 @@ model Donation {
 
   receipt          Receipt?
   memberCollection MemberCollection?
+  chequeEntry      ChequeRegister?
 }
 
 // ─── Member Collections ───────────────────────────────────────────────────────
@@ -350,6 +384,121 @@ model Expense {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  chequeEntry ChequeRegister?
+  chequeLeafId String?         @unique @db.ObjectId
+  chequeLeaf   ChequeBookLeaf? @relation(fields: [chequeLeafId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// ─── Cheque Register ───────────────────────────────────────────────────────────
+
+model ChequeRegister {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  chequeNumber  String
+  chequeDate    DateTime
+  bankName      String?
+  amount        Float
+  partyName     String?
+  nature        ChequeNature
+  status        ChequeStatus @default(PENDING)
+  clearedDate   DateTime?
+  bouncedReason String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  accountId String?      @db.ObjectId
+  account   BankAccount? @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  donationId String?    @unique @db.ObjectId
+  donation   Donation?  @relation(fields: [donationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  expenseId String?   @unique @db.ObjectId
+  expense   Expense?  @relation(fields: [expenseId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  chequeLeafId String?         @unique @db.ObjectId
+  chequeLeaf   ChequeBookLeaf? @relation(fields: [chequeLeafId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model ChequeBook {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  bookNo      String
+  startNumber String
+  endNumber   String
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  accountId String      @db.ObjectId
+  account   BankAccount @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  leaves ChequeBookLeaf[]
+}
+
+model ChequeBookLeaf {
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  chequeNumber   String
+  status         ChequeLeafStatus @default(UNUSED)
+  issuedAt       DateTime?
+  cancelledAt    DateTime?
+  cancelledReason String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  chequeBookId String    @db.ObjectId
+  chequeBook   ChequeBook @relation(fields: [chequeBookId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  accountId String      @db.ObjectId
+  account   BankAccount @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  expense      Expense?
+  chequeEntry  ChequeRegister?
+
+  @@unique([accountId, chequeNumber])
+}
+
+// ─── Asset Register ────────────────────────────────────────────────────────────
+
+model AssetRegister {
+  id                 String             @id @default(auto()) @map("_id") @db.ObjectId
+  assetCode          String             @unique
+  name               String
+  category           String
+  purchaseDate       DateTime
+  purchaseValue      Float
+  residualValue      Float              @default(0)
+  usefulLifeYears    Int?
+  depreciationMethod DepreciationMethod @default(STRAIGHT_LINE)
+  location           String?
+  custodian          String?
+  vendorName         String?
+  invoiceNumber      String?
+  status             AssetStatus        @default(ACTIVE)
+  currentBookValue   Float?
+  disposalDate       DateTime?
+  disposalValue      Float?
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  purchaseAccountId String?      @db.ObjectId
+  purchaseAccount   BankAccount? @relation(fields: [purchaseAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  depreciationEntries AssetDepreciationEntry[]
+}
+
+model AssetDepreciationEntry {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  assetId       String   @db.ObjectId
+  periodStart   DateTime
+  periodEnd     DateTime
+  amount        Float
+  postedDate    DateTime @default(now())
+  journalRef    String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  asset AssetRegister @relation(fields: [assetId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────

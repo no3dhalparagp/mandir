@@ -17,6 +17,8 @@ import {
   ArrowLeftRight,
   FileBarChart2,
   UserCheck,
+  Landmark,
+  ClipboardCheck,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -135,6 +137,22 @@ const navGroups: NavGroup[] = [
           { title: "Expense Summary", url: "/dashboard/reports/expenses" },
           { title: "Cash Book", url: "/dashboard/reports/cash-book" },
         ],
+      },
+    ],
+  },
+  {
+    label: "Registers",
+    roles: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
+    items: [
+      {
+        title: "Cheque Register",
+        url: "/dashboard/registers/cheques",
+        icon: ClipboardCheck,
+      },
+      {
+        title: "Asset Register",
+        url: "/dashboard/registers/assets",
+        icon: Landmark,
       },
     ],
   },

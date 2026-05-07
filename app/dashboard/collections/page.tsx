@@ -3,12 +3,8 @@
 import { getAllCollections } from "./actions"
 import { getBankAccounts } from "@/app/dashboard/bank/actions"
 
-import { format } from "date-fns"
-
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-
-import { Badge } from "@/components/ui/badge"
 
 import {
   Card,
@@ -16,29 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-
-import { VerifyCollectionButton } from "@/components/collections/verify-collection-button"
-
-import { DepositCollectionButton } from "@/components/collections/deposit-collection-button"
-
-const statusColors: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  COLLECTED: "secondary",
-  DEPOSITED: "outline",
-  VERIFIED: "default",
-  DISCREPANT: "destructive",
-}
+import { CollectionsTable } from "@/components/collections/collections-table"
 
 export default async function CollectionsPage() {
   const session = await auth()
@@ -200,176 +174,11 @@ export default async function CollectionsPage() {
       {/* ---------------------------------------------------------------------- */}
 
       <Card>
-        <CardHeader>
-          <CardTitle>
-            {isAdminOrAccountant
-              ? "All Collections"
-              : "My Collections"}
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Member</TableHead>
-                <TableHead>Donor / Receipt</TableHead>
-                <TableHead>Collected (₹)</TableHead>
-                <TableHead>Verified (₹)</TableHead>
-                <TableHead>Shortage (₹)</TableHead>
-                <TableHead>Deposited To</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Verified By</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-
-            <TableBody>
-              {collections.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={10}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No collections found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                collections.map((c) => {
-                  const verifiedAmount =
-                    c.verifiedAmount ?? c.collectedAmount
-
-                  const shortage =
-                    c.status === "DISCREPANT"
-                      ? c.collectedAmount - verifiedAmount
-                      : 0
-
-                  return (
-                    <TableRow key={c.id}>
-                      {/* Date */}
-                      <TableCell className="text-sm">
-                        {format(c.collectedDate, "dd MMM yy")}
-                      </TableCell>
-
-                      {/* Member */}
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-sm">
-                            {c.member.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {c.member.memberId}
-                          </p>
-                        </div>
-                      </TableCell>
-
-                      {/* Donor */}
-                      <TableCell>
-                        <div>
-                          <p className="text-sm">
-                            {c.donation.donorName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {c.donation.receiptNo}
-                          </p>
-                        </div>
-                      </TableCell>
-
-                      {/* Collected */}
-                      <TableCell className="font-bold">
-                        ₹
-                        {c.collectedAmount.toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                        })}
-                      </TableCell>
-
-                      {/* Verified */}
-                      <TableCell className="font-medium">
-                        ₹
-                        {verifiedAmount.toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                        })}
-                      </TableCell>
-
-                      {/* Shortage */}
-                      <TableCell>
-                        {shortage > 0 ? (
-                          <span className="font-bold text-red-600">
-                            ₹
-                            {shortage.toLocaleString("en-IN", {
-                              minimumFractionDigits: 2,
-                            })}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-
-                      {/* Deposited To */}
-                      <TableCell className="text-sm text-muted-foreground">
-                        {c.depositedToAccount?.name ?? "—"}
-                      </TableCell>
-
-                      {/* Status */}
-                      <TableCell>
-                        <Badge
-                          variant={
-                            statusColors[c.status] ?? "outline"
-                          }
-                        >
-                          {c.status}
-                        </Badge>
-                      </TableCell>
-
-                      {/* Verified By */}
-                      <TableCell className="text-sm text-muted-foreground">
-                        {c.verifiedBy?.name ?? "—"}
-                      </TableCell>
-
-                      {/* Actions */}
-                      <TableCell className="text-right">
-                        {/* Deposit */}
-                        {isAdminOrAccountant &&
-                          c.status === "COLLECTED" && (
-                            <DepositCollectionButton
-                              collectionId={c.id}
-                              accounts={accounts}
-                            />
-                          )}
-
-                        {/* Verify */}
-                        {isAdminOrAccountant &&
-                          ["DEPOSITED", "COLLECTED"].includes(
-                            c.status
-                          ) && (
-                            <div className="ml-2 inline-block">
-                              <VerifyCollectionButton
-                                collectionId={c.id}
-                                collectedAmount={c.collectedAmount}
-                              />
-                            </div>
-                          )}
-
-                        {/* Recollect */}
-                        {isAdminOrAccountant &&
-                          c.status === "DISCREPANT" && (
-                            <div className="ml-2 inline-block">
-                              <DepositCollectionButton
-                                collectionId={c.id}
-                                accounts={accounts}
-                                recollectMode
-                              />
-                            </div>
-                          )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
+        <CollectionsTable
+          collections={collections as any}
+          accounts={accounts as any}
+          isAdminOrAccountant={isAdminOrAccountant}
+        />
       </Card>
     </div>
   )

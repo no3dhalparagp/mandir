@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
-import { DonationCategory, PaymentMode } from "@prisma/client"
+import { ChequeNature, DonationCategory, PaymentMode } from "@prisma/client"
 import { requirePermission, requireAuth, hasPermission } from "@/lib/authorization"
 
 async function recalculateBalancesForAccount(accountId: string) {
@@ -69,6 +69,26 @@ export async function createDonation(data: z.infer<typeof donationSchema>) {
       },
     })
 
+    if (
+      validatedData.paymentMode === "CHEQUE" &&
+      validatedData.chequeNumber &&
+      validatedData.chequeDate
+    ) {
+      await prisma.chequeRegister.create({
+        data: {
+          chequeNumber: validatedData.chequeNumber,
+          chequeDate: new Date(validatedData.chequeDate),
+          bankName: validatedData.bankNameCheque || undefined,
+          amount: donation.amount,
+          partyName: donation.donorName,
+          nature: ChequeNature.RECEIVED,
+          accountId: validatedData.accountId || undefined,
+          donationId: donation.id,
+          notes: `Auto-created from donation receipt ${donation.receiptNo}`,
+        },
+      })
+    }
+
     if (validatedData.collectedByMemberId) {
       await prisma.memberCollection.create({
         data: {
@@ -97,6 +117,7 @@ export async function createDonation(data: z.infer<typeof donationSchema>) {
     revalidatePath("/dashboard/donations")
     revalidatePath("/dashboard/bank")
     revalidatePath("/dashboard")
+    revalidatePath("/dashboard/registers/cheques")
     return { success: true, data: donation }
   } catch (error) {
     console.error("Donation creation failed:", error)

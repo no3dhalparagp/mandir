@@ -27,6 +27,7 @@ interface ExpenseRow {
 interface ExpensesPageClientProps {
   expenses: ExpenseRow[]
   accounts: { id: string; name: string }[]
+  chequeLeaves: { id: string; chequeNumber: string; accountId: string; account: { name: string } }[]
 }
 
 const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -36,7 +37,7 @@ const statusColors: Record<string, "default" | "secondary" | "destructive" | "ou
   PAID: "outline",
 }
 
-export function ExpensesPageClient({ expenses, accounts }: ExpensesPageClientProps) {
+export function ExpensesPageClient({ expenses, accounts, chequeLeaves }: ExpensesPageClientProps) {
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
 
@@ -74,6 +75,7 @@ export function ExpensesPageClient({ expenses, accounts }: ExpensesPageClientPro
             </DialogHeader>
             <ExpenseForm
               accounts={accounts}
+              chequeLeaves={chequeLeaves}
               onSuccess={() => { setOpen(false); window.location.reload() }}
             />
           </DialogContent>
