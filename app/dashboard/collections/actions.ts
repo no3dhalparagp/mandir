@@ -29,52 +29,32 @@ async function recalculateBalancesForAccount(
     await prisma.ledgerEntry.findMany({
       where: {
         accountId,
-
         OR: [
-          {
-            isCleared: true,
-          },
-          {
-            isCleared: null,
-          },
+          { isCleared: true },
+          { isCleared: null },
         ],
       },
-
       orderBy: [
-        {
-          date: "asc",
-        },
-        {
-          createdAt: "asc",
-        },
+        { date: "asc" },
+        { createdAt: "asc" },
       ],
     })
 
   let balance = 0
 
   for (const entry of entries) {
-    const isDebit = [
-      "EXPENSE",
-      "TRANSFER_OUT",
-    ].includes(entry.type)
+    const isDebit = ["EXPENSE", "TRANSFER_OUT"].includes(entry.type)
 
     balance = isDebit
       ? balance - entry.amount
       : balance + entry.amount
 
     await prisma.ledgerEntry.update({
-      where: {
-        id: entry.id,
-      },
-
-      data: {
-        runningBalance: balance,
-      },
+      where: { id: entry.id },
+      data: { runningBalance: balance },
     })
   }
 }
-
-    
 
 /* -------------------------------------------------------------------------- */
 /*                           Pending Collections                              */
@@ -84,9 +64,7 @@ export async function getPendingCollections() {
   await requirePermission("collections", "read")
 
   return prisma.memberCollection.findMany({
-    where: {
-      status: { in: ["COLLECTED", "DEPOSITED"] },
-    },
+    where: { status: { in: ["COLLECTED", "DEPOSITED"] } },
     include: {
       member: true,
       donation: true,
@@ -404,7 +382,6 @@ export async function markCollectionDeposited(
 /*                            Verify Collection                               */
 /* -------------------------------------------------------------------------- */
 
-
 export async function verifyCollection(
   collectionId: string,
   verifiedAmount: number,
@@ -468,22 +445,15 @@ export async function verifyCollection(
     /* POST VERIFIED AMOUNT                                       */
     /* ---------------------------------------------------------- */
 
-    let targetAccountName:
-      | string
-      | undefined
-
-    let currentBalance:
-      | number
-      | undefined
+    let targetAccountName: string | undefined
+    let currentBalance: number | undefined
 
     if (verifiedAmount > 0) {
-      const donationAccount =
-        collection.donation?.account
+      const donationAccount = collection.donation?.account
 
       if (!donationAccount) {
         return {
-          error:
-            "No receipt account linked with donation.",
+          error: "No receipt account linked with donation.",
         }
       }
 
@@ -492,29 +462,17 @@ export async function verifyCollection(
       /* ------------------------------------------------------ */
 
       if (
-        donationAccount.accountType ===
-        AccountType.CASH_IN_HAND
+        donationAccount.accountType === AccountType.CASH_IN_HAND
       ) {
         await addVerifiedCollectionToCashAccount({
-          cashAccountId:
-            donationAccount.id,
-
+          cashAccountId: donationAccount.id,
           amount: verifiedAmount,
-
           collectionId,
-
-          collectorName:
-            collection.member?.name ??
-            undefined,
+          collectorName: collection.member?.name ?? undefined,
         })
 
-        targetAccountName =
-          donationAccount.name
-
-        currentBalance =
-          await getAccountBalance(
-            donationAccount.id
-          )
+        targetAccountName = donationAccount.name
+        currentBalance = await getAccountBalance(donationAccount.id)
       }
 
       /* ------------------------------------------------------ */
@@ -524,103 +482,24 @@ export async function verifyCollection(
       else {
         await prisma.ledgerEntry.create({
           data: {
-            accountId:
-              donationAccount.id,
-
+            accountId: donationAccount.id,
             type: "INCOME",
-
-            amount: Number(
-              verifiedAmount
-            ),
-
+            amount: Number(verifiedAmount),
             description: `Cheque collection from ${
-              collection.member?.name ??
-              "member"
+              collection.member?.name ?? "member"
             }`,
-
-            referenceId:
-              collectionId,
-
+            referenceId: collectionId,
             referenceType: "OTHER",
-
             isCleared: false,
-
             clearedAt: null,
           },
         })
 
-        await recalculateBalancesForAccount(
-          donationAccount.id
-        )
+        await recalculateBalancesForAccount(donationAccount.id)
 
-        targetAccountName =
-          donationAccount.name
-
-        currentBalance =
-          await getAccountBalance(
-            donationAccount.id
-          )
+        targetAccountName = donationAccount.name
+        currentBalance = await getAccountBalance(donationAccount.id)
       }
-    }
-
-    revalidatePath(
-      "/dashboard/collections"
-    )
-
-    revalidatePath(
-      "/dashboard/bank"
-    )
-
-    revalidatePath(
-      "/dashboard/journal"
-    )
-
-    return {
-      success: true,
-      balance: currentBalance,
-      accountName:
-        targetAccountName,
-    }
-  } catch (error: unknown) {
-    return {
-      error: getErrorMessage(
-        error,
-        "Failed to verify collection."
-      ),
-    }
-  }
-}
-    /* ---------------------------------------------------------------------- */
-    /*                           Post To Cash Account                         */
-    /* ---------------------------------------------------------------------- */
-
-    let targetAccountName: string | undefined
-    let currentBalance = undefined
-
-    // Post verified amount to cash account even if there's a discrepancy
-    if (verifiedAmount > 0) {
-      // Find default cash-in-hand account
-      const cashAccount = await prisma.bankAccount.findFirst({
-        where: { accountType: AccountType.CASH_IN_HAND },
-      })
-
-      if (!cashAccount) {
-        return {
-          error:
-            "No Cash in Hand account found. Please create one under Bank Accounts first.",
-        }
-      }
-
-      await addVerifiedCollectionToCashAccount({
-        cashAccountId: cashAccount.id,
-        amount: verifiedAmount,
-        collectionId,
-        collectorName: collection.member?.name ?? undefined,
-      })
-
-      targetAccountName = cashAccount.name
-
-      currentBalance = await getAccountBalance(cashAccount.id)
     }
 
     revalidatePath("/dashboard/collections")
@@ -637,76 +516,44 @@ export async function verifyCollection(
       error: getErrorMessage(error, "Failed to verify collection."),
     }
   }
-
 }
 
-export async function encashChequeEntry(
-  ledgerEntryId: string
-) {
+/* -------------------------------------------------------------------------- */
+/*                            Encash Cheque Entry                             */
+/* -------------------------------------------------------------------------- */
+
+export async function encashChequeEntry(ledgerEntryId: string) {
   try {
-    await requirePermission(
-      "bank",
-      "update"
-    )
+    await requirePermission("bank", "update")
 
-    const entry =
-      await prisma.ledgerEntry.findUnique({
-        where: {
-          id: ledgerEntryId,
-        },
-
-        include: {
-          account: true,
-        },
-      })
+    const entry = await prisma.ledgerEntry.findUnique({
+      where: { id: ledgerEntryId },
+      include: { account: true },
+    })
 
     if (!entry) {
-      return {
-        error: "Ledger entry not found.",
-      }
+      return { error: "Ledger entry not found." }
     }
 
     if (entry.isCleared) {
-      return {
-        error:
-          "Cheque already encashed.",
-      }
+      return { error: "Cheque already encashed." }
     }
 
     await prisma.ledgerEntry.update({
-      where: {
-        id: ledgerEntryId,
-      },
-
+      where: { id: ledgerEntryId },
       data: {
         isCleared: true,
-
         clearedAt: new Date(),
       },
     })
 
-    await recalculateBalancesForAccount(
-      entry.accountId
-    )
+    await recalculateBalancesForAccount(entry.accountId)
 
-    revalidatePath(
-      "/dashboard/bank"
-    )
+    revalidatePath("/dashboard/bank")
+    revalidatePath("/dashboard/journal")
 
-    revalidatePath(
-      "/dashboard/journal"
-    )
-
-    return {
-      success: true,
-    }
+    return { success: true }
   } catch (error: unknown) {
-    return {
-      error: getErrorMessage(
-        error,
-        "Failed to encash cheque."
-      ),
-    }
+    return { error: getErrorMessage(error, "Failed to encash cheque.") }
   }
 }
-
