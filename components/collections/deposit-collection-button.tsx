@@ -90,7 +90,7 @@ export function DepositCollectionButton({
       open={open}
       onOpenChange={setOpen}
     >
-      <DialogTrigger asChild>
+      <DialogTrigger>
         <Button
           size="sm"
           variant={
