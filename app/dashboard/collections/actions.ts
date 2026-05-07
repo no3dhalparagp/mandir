@@ -3,7 +3,9 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
+
 import { getAccountBalance } from "@/app/dashboard/bank/actions"
+
 import {
   requirePermission,
   requireAuth,
@@ -29,6 +31,164 @@ async function recalculateBalancesForAccount(accountId: string) {
       where: { id: entry.id },
       data: { runningBalance: balance },
     })
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                           Pending Collections                              */
+/* -------------------------------------------------------------------------- */
+
+export async function getPendingCollections() {
+  await requirePermission("collections", "read")
+
+  return prisma.memberCollection.findMany({
+    where: {
+      status: { in: ["COLLECTED", "DEPOSITED"] },
+    },
+    include: {
+      member: true,
+      donation: true,
+      depositedToAccount: true,
+    },
+    orderBy: { collectedDate: "desc" },
+  })
+}
+
+/* -------------------------------------------------------------------------- */
+/*                             All Collections                                */
+/* -------------------------------------------------------------------------- */
+
+export async function getAllCollections() {
+  await requireAuth()
+
+  const session = await auth()
+
+  let whereClause = {}
+
+  if (session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { member: true },
+    })
+
+    if (
+      user &&
+      !["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"].includes(user.role)
+    ) {
+      if (user.member) {
+        whereClause = { memberId: user.member.id }
+      } else {
+        return []
+      }
+    }
+  }
+
+  return prisma.memberCollection.findMany({
+    where: whereClause,
+    include: {
+      member: true,
+      donation: true,
+      depositedToAccount: true,
+      verifiedBy: { select: { name: true } },
+    },
+    orderBy: { collectedDate: "desc" },
+    take: 100,
+  })
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              Member Ledger                                 */
+/* -------------------------------------------------------------------------- */
+
+export async function getMemberLedger(memberId: string) {
+  await requireAuth()
+
+  const collections = await prisma.memberCollection.findMany({
+    where: { memberId },
+    include: {
+      donation: true,
+      depositedToAccount: true,
+      verifiedBy: { select: { name: true } },
+    },
+    orderBy: { collectedDate: "desc" },
+  })
+
+  /* ---------------------------------------------------------------------- */
+  /*                                 Totals                                 */
+  /* ---------------------------------------------------------------------- */
+
+  const totalCollected = collections.reduce((s, c) => s + c.collectedAmount, 0)
+
+  const totalDeposited = collections
+    .filter((c) => ["DEPOSITED", "VERIFIED"].includes(c.status))
+    .reduce((s, c) => s + (c.verifiedAmount ?? c.collectedAmount), 0)
+
+  const totalVerified = collections
+    .filter((c) => c.status === "VERIFIED")
+    .reduce((s, c) => s + (c.verifiedAmount ?? c.collectedAmount), 0)
+
+  const pendingDeposit = collections
+    .filter((c) => c.status === "COLLECTED")
+    .reduce((s, c) => s + c.collectedAmount, 0)
+
+  const pendingVerification = collections
+    .filter((c) => c.status === "DEPOSITED")
+    .reduce((s, c) => s + c.collectedAmount, 0)
+
+  const recollectionRequired = collections
+    .filter((c) => c.status === "DISCREPANT")
+    .reduce((s, c) => {
+      const verified = c.verifiedAmount ?? 0
+      return s + (c.collectedAmount - verified)
+    }, 0)
+
+  const discrepantCollections = collections.filter(
+    (c) => c.status === "DISCREPANT"
+  )
+
+  const outstanding = pendingDeposit + pendingVerification + recollectionRequired
+
+  return {
+    collections,
+    totalCollected,
+    totalDeposited,
+    totalVerified,
+    pendingDeposit,
+    pendingVerification,
+    recollectionRequired,
+    discrepantCollections,
+    outstanding,
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                        Mark Collection Deposited                           */
+/* -------------------------------------------------------------------------- */
+
+export async function markCollectionDeposited(
+  collectionId: string,
+  depositedToAccountId: string,
+  depositSlipNo?: string
+) {
+  try {
+    await requirePermission("collections", "deposit")
+
+    await prisma.memberCollection.update({
+      where: { id: collectionId },
+      data: {
+        status: "DEPOSITED",
+        depositedToAccountId,
+        depositedDate: new Date(),
+        depositSlipNo,
+      },
+    })
+
+    revalidatePath("/dashboard/collections")
+    return { success: true }
+  } catch (error: any) {
+    return {
+      error: error.message || "Failed to mark as deposited.",
+    }
   }
 }
 
@@ -59,7 +219,6 @@ export async function verifyCollection(
 
     const hasDiscrepancy = verifiedAmount !== collection.collectedAmount
 
-    // Update the collection record
     await prisma.memberCollection.update({
       where: { id: collectionId },
       data: {
@@ -128,29 +287,5 @@ export async function verifyCollection(
     return {
       error: error.message || "Failed to verify collection.",
     }
-  }
-}
-export async function markCollectionDeposited(
-  collectionId: string,
-  depositedToAccountId: string,
-  depositSlipNo?: string
-) {
-  try {
-    await requirePermission("collections", "deposit")
-
-    await prisma.memberCollection.update({
-      where: { id: collectionId },
-      data: {
-        status: "DEPOSITED",
-        depositedToAccountId,
-        depositedDate: new Date(),
-        depositSlipNo,
-      },
-    })
-
-    revalidatePath("/dashboard/collections")
-    return { success: true }
-  } catch (error: any) {
-    return { error: error.message || "Failed to mark as deposited." }
   }
 }
