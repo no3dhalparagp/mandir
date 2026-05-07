@@ -13,10 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { createExpense } from "@/app/dashboard/expenses/actions"
 
-// ✅ Define valid payment modes to match the server-side PaymentMode enum
+// Exact list of payment modes – matches the Prisma/PaymentMode enum
 const PAYMENT_MODES = [
   "CASH", "UPI", "CHEQUE", "NEFT", "RTGS", "DD", "IMPS"
-] as const;
+] as const
 
 const expenseSchema = z.object({
   title: z.string().min(2, "Title is required."),
@@ -35,7 +35,7 @@ const expenseSchema = z.object({
   amount: z.number({ error: "Amount is required" }).min(1, "Amount must be positive"),
   vendorName: z.string().optional(),
   vendorMobile: z.string().optional(),
-  paymentMode: z.enum(PAYMENT_MODES), // ✅ was z.string()
+  paymentMode: z.enum(PAYMENT_MODES), // ✅ matches server action PaymentMode
   chequeNumber: z.string().optional(),
   chequeDate: z.string().optional(),
   transactionId: z.string().optional(),
@@ -62,7 +62,7 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
 
   function onSubmit(data: ExpenseFormData) {
     startTransition(async () => {
-      const result = await createExpense(data) // ✅ type now matches exactly
+      const result = await createExpense(data)
       if (result.error) toast.error(result.error)
       else { toast.success("Expense recorded!"); onSuccess() }
     })
@@ -130,9 +130,10 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
           <Label>Payment Mode</Label>
           <Select
             onValueChange={(v) => {
-              // ✅ Cast to the exact union type from the schema
-              setValue("paymentMode", v as ExpenseFormData["paymentMode"]);
-              setPaymentMode(v);
+              // `v` can be `string | null`; fallback to "CASH"
+              const mode = v ?? "CASH"
+              setValue("paymentMode", mode as ExpenseFormData["paymentMode"])
+              setPaymentMode(mode)
             }}
             defaultValue="CASH"
           >
