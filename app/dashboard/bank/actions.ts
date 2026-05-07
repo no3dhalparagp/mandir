@@ -4,50 +4,90 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
-import { AccountType } from "@prisma/client"
+import {
+  AccountType,
+  LedgerTransactionType,
+} from "@prisma/client"
+
 import { requirePermission } from "@/lib/authorization"
 
+/* ======================================================
+   SCHEMA
+====================================================== */
+
 const bankAccountSchema = z.object({
-  name: z.string().min(2, "Account name is required"),
+  name: z
+    .string()
+    .min(2, "Account name is required"),
+
   accountNumber: z.string().optional(),
+
   bankName: z.string().optional(),
+
   branchName: z.string().optional(),
+
   ifscCode: z.string().optional(),
-  accountType: z.nativeEnum(AccountType),
-  openingBalance: z.coerce.number().default(0),
+
+  accountType:
+    z.nativeEnum(AccountType),
+
+  openingBalance:
+    z.coerce.number().default(0),
+
   notes: z.string().optional(),
 })
 
-/* -------------------------------------------------------
-   RECALCULATE RUNNING BALANCE
-------------------------------------------------------- */
+/* ======================================================
+   DEBIT TYPES
+====================================================== */
 
-async function recalculateRunningBalances(accountId: string) {
-  const entries = await prisma.ledgerEntry.findMany({
-    where: { accountId },
-    orderBy: [
-      { date: "asc" },
-      { createdAt: "asc" },
-    ],
-  })
+const debitTypes: LedgerTransactionType[] =
+  [
+    "EXPENSE",
+    "TRANSFER_OUT",
+  ]
+
+/* ======================================================
+   RECALCULATE RUNNING BALANCE
+====================================================== */
+
+async function recalculateRunningBalances(
+  accountId: string
+) {
+  const entries =
+    await prisma.ledgerEntry.findMany({
+      where: {
+        accountId,
+      },
+
+      orderBy: [
+        {
+          date: "asc",
+        },
+        {
+          createdAt: "asc",
+        },
+      ],
+    })
 
   let balance = 0
 
   for (const entry of entries) {
-    const debitTypes = [
-      "EXPENSE",
-      "TRANSFER_OUT",
-      "WITHDRAW",
-    ]
+    const amount = Number(entry.amount)
 
-    const isDebit = debitTypes.includes(entry.type)
-
-    balance = isDebit
-      ? balance - Number(entry.amount)
-      : balance + Number(entry.amount)
+    if (
+      debitTypes.includes(entry.type)
+    ) {
+      balance -= amount
+    } else {
+      balance += amount
+    }
 
     await prisma.ledgerEntry.update({
-      where: { id: entry.id },
+      where: {
+        id: entry.id,
+      },
+
       data: {
         runningBalance: balance,
       },
@@ -55,15 +95,21 @@ async function recalculateRunningBalances(accountId: string) {
   }
 }
 
-/* -------------------------------------------------------
-   GET ALL ACCOUNTS
-------------------------------------------------------- */
+/* ======================================================
+   GET ALL BANK ACCOUNTS
+====================================================== */
 
 export async function getBankAccounts() {
-  await requirePermission("bank", "read")
+  await requirePermission(
+    "bank",
+    "read"
+  )
 
   return prisma.bankAccount.findMany({
-    orderBy: { createdAt: "asc" },
+    orderBy: {
+      createdAt: "asc",
+    },
+
     include: {
       _count: {
         select: {
@@ -76,57 +122,93 @@ export async function getBankAccounts() {
   })
 }
 
-/* -------------------------------------------------------
+/* ======================================================
    GET SINGLE ACCOUNT
-------------------------------------------------------- */
+====================================================== */
 
-export async function getBankAccountById(id: string) {
-  await requirePermission("bank", "read")
+export async function getBankAccountById(
+  id: string
+) {
+  await requirePermission(
+    "bank",
+    "read"
+  )
 
   return prisma.bankAccount.findUnique({
-    where: { id },
+    where: {
+      id,
+    },
+
     include: {
       ledgerEntries: {
-        orderBy: { date: "desc" },
+        orderBy: {
+          date: "desc",
+        },
+
         take: 100,
       },
     },
   })
 }
 
-/* -------------------------------------------------------
-   CREATE ACCOUNT
-------------------------------------------------------- */
+/* ======================================================
+   CREATE BANK ACCOUNT
+====================================================== */
 
 export async function createBankAccount(
-  data: z.infer<typeof bankAccountSchema>
+  data: z.infer<
+    typeof bankAccountSchema
+  >
 ) {
   try {
-    await requirePermission("bank", "create")
+    await requirePermission(
+      "bank",
+      "create"
+    )
 
-    const validated = bankAccountSchema.parse(data)
+    const validated =
+      bankAccountSchema.parse(data)
 
-    const account = await prisma.bankAccount.create({
-      data: validated,
-    })
+    const account =
+      await prisma.bankAccount.create({
+        data: validated,
+      })
 
-    /* Opening Balance Entry */
-    if (validated.openingBalance > 0) {
+    /* ---------------------------------------------
+       OPENING BALANCE
+    --------------------------------------------- */
+
+    if (
+      validated.openingBalance > 0
+    ) {
       await prisma.ledgerEntry.create({
         data: {
           accountId: account.id,
-          type: "OPENING_BALANCE",
-          amount: validated.openingBalance,
+
+          type:
+            "OPENING_BALANCE",
+
+          amount:
+            validated.openingBalance,
+
           description: `Opening balance for ${validated.name}`,
-          referenceType: "OPENING_BALANCE",
-          runningBalance: validated.openingBalance,
+
+          referenceType:
+            "OPENING_BALANCE",
+
+          runningBalance:
+            validated.openingBalance,
         },
       })
     }
 
-    await recalculateRunningBalances(account.id)
+    await recalculateRunningBalances(
+      account.id
+    )
 
-    revalidatePath("/dashboard/bank")
+    revalidatePath(
+      "/dashboard/bank"
+    )
 
     return {
       success: true,
@@ -139,38 +221,42 @@ export async function createBankAccount(
       error:
         error instanceof Error
           ? error.message
-          : "Failed to create account",
+          : "Failed to create bank account",
     }
   }
 }
 
-/* -------------------------------------------------------
+/* ======================================================
    GET ACCOUNT BALANCE
-------------------------------------------------------- */
+====================================================== */
 
 export async function getAccountBalance(
   accountId: string
 ) {
-  const entries = await prisma.ledgerEntry.findMany({
-    where: { accountId },
-    orderBy: [
-      { date: "asc" },
-      { createdAt: "asc" },
-    ],
-  })
+  const entries =
+    await prisma.ledgerEntry.findMany({
+      where: {
+        accountId,
+      },
 
-  const debitTypes = [
-    "EXPENSE",
-    "TRANSFER_OUT",
-    "WITHDRAW",
-  ]
+      orderBy: [
+        {
+          date: "asc",
+        },
+        {
+          createdAt: "asc",
+        },
+      ],
+    })
 
   let balance = 0
 
   for (const entry of entries) {
     const amount = Number(entry.amount)
 
-    if (debitTypes.includes(entry.type)) {
+    if (
+      debitTypes.includes(entry.type)
+    ) {
       balance -= amount
     } else {
       balance += amount
@@ -180,34 +266,43 @@ export async function getAccountBalance(
   return balance
 }
 
-/* -------------------------------------------------------
+/* ======================================================
    ADD VERIFIED COLLECTION TO CASH ACCOUNT
-------------------------------------------------------- */
+====================================================== */
 
-export async function addVerifiedCollectionToCashAccount({
-  cashAccountId,
-  amount,
-  collectionId,
-  collectorName,
-}: {
-  cashAccountId: string
-  amount: number
-  collectionId: string
-  collectorName?: string
-}) {
+export async function addVerifiedCollectionToCashAccount(
+  {
+    cashAccountId,
+    amount,
+    collectionId,
+    collectorName,
+  }: {
+    cashAccountId: string
+    amount: number
+    collectionId: string
+    collectorName?: string
+  }
+) {
   try {
     await prisma.ledgerEntry.create({
       data: {
         accountId: cashAccountId,
-        type: "COLLECTION",
+
+        // VALID ENUM
+        type: "INCOME",
+
         amount: Number(amount),
+
         description: `Verified collection${
           collectorName
             ? ` from ${collectorName}`
             : ""
         }`,
+
         referenceId: collectionId,
-        referenceType: "COLLECTION",
+
+        // USE VALID ENUM
+        referenceType: "OTHER",
       },
     })
 
@@ -215,7 +310,9 @@ export async function addVerifiedCollectionToCashAccount({
       cashAccountId
     )
 
-    revalidatePath("/dashboard/bank")
+    revalidatePath(
+      "/dashboard/bank"
+    )
 
     return {
       success: true,
@@ -227,21 +324,25 @@ export async function addVerifiedCollectionToCashAccount({
       error:
         error instanceof Error
           ? error.message
-          : "Failed to add collection",
+          : "Failed to add collection to cash account",
     }
   }
 }
 
-/* -------------------------------------------------------
+/* ======================================================
    RECALCULATE BALANCES
-------------------------------------------------------- */
+====================================================== */
 
 export async function recalculateBalances(
   accountId: string
 ) {
-  await recalculateRunningBalances(accountId)
+  await recalculateRunningBalances(
+    accountId
+  )
 
-  revalidatePath("/dashboard/bank")
+  revalidatePath(
+    "/dashboard/bank"
+  )
 
   return {
     success: true,
