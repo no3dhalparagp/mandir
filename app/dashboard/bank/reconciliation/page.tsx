@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { Plus, CreditCard } from "lucide-react"
 import Link from "next/link"
 
 export default async function ReconciliationPage() {
@@ -32,11 +32,18 @@ export default async function ReconciliationPage() {
             Match bank statements against book entries to find discrepancies.
           </p>
         </div>
-        <Link href="/dashboard/bank/reconciliation/new">
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" /> New Reconciliation
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/dashboard/registers/cheques">
+            <Button variant="outline" className="gap-2">
+              <CreditCard className="h-4 w-4" /> Cheque Management
+            </Button>
+          </Link>
+          <Link href="/dashboard/bank/reconciliation/new">
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" /> New Reconciliation
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Card>

@@ -37,13 +37,13 @@ export function DonationsPageClient({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Donations</h1>
           <p className="text-muted-foreground">Manage and view all mandir donations.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button />}>
+          <DialogTrigger render={<Button className="shadow-md hover:shadow-lg transition-all duration-300" />}>
             <Plus className="mr-2 h-4 w-4" /> Add Donation
           </DialogTrigger>
           <DialogContent className="sm:max-w-[560px]">
@@ -65,10 +65,10 @@ export function DonationsPageClient({
         </Dialog>
       </div>
 
-      <Card>
+      <Card className="border-0 bg-card/50 shadow-sm">
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/30">
               <TableRow>
                 <TableHead>Receipt</TableHead>
                 <TableHead>Date</TableHead>
@@ -90,7 +90,7 @@ export function DonationsPageClient({
                 </TableRow>
               ) : (
                 donations.map((d) => (
-                  <TableRow key={d.id}>
+                  <TableRow key={d.id} className="hover:bg-muted/30 transition-colors">
                     <TableCell className="font-mono text-xs">{d.receiptNo}</TableCell>
                     <TableCell className="text-sm">{format(new Date(d.date), "dd MMM yy")}</TableCell>
                     <TableCell className="font-medium">{d.donorName}</TableCell>
@@ -100,7 +100,7 @@ export function DonationsPageClient({
                     <TableCell className="text-sm text-muted-foreground">
                       {d.collectedByMember ? `${d.collectedByMember.name}` : "—"}
                     </TableCell>
-                    <TableCell className="text-right font-bold text-green-600">
+                    <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-400">
                       {d.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
@@ -108,9 +108,9 @@ export function DonationsPageClient({
                         href={`/api/receipt/${d.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 hover:scale-105"
                       >
-                        <Download className="h-3.5 w-3.5" />
+                        <Download className="h-4 w-4" />
                       </a>
                     </TableCell>
                   </TableRow>

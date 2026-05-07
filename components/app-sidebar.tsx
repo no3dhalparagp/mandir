@@ -21,6 +21,7 @@ import {
   ClipboardCheck,
   BookOpen,
   ScrollText,
+  Lock,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -138,6 +139,7 @@ const navGroups: NavGroup[] = [
           { title: "Daily Collection", url: "/dashboard/reports/daily" },
           { title: "Monthly Statement", url: "/dashboard/reports/monthly" },
           { title: "Yearly Audit", url: "/dashboard/reports/yearly" },
+          { title: "Month Close", url: "/dashboard/reports/month-close" },
           { title: "Donation Summary", url: "/dashboard/reports/donations" },
           { title: "Expense Summary", url: "/dashboard/reports/expenses" },
           { title: "Cash Book", url: "/dashboard/reports/cash-book" },
