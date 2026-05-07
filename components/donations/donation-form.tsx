@@ -20,9 +20,26 @@ const donationSchema = z.object({
   donorName: z.string().min(2, "Name is required."),
   mobileNumber: z.string().optional(),
   address: z.string().optional(),
-  category: z.string(),
+  category: z.enum([
+    "GENERAL",
+    "PUJA",
+    "FESTIVAL",
+    "CONSTRUCTION",
+    "ANNADAN",
+    "SPECIAL",
+    "SEWA",
+    "TRUST_FUND",
+  ]),
   amount: z.number({ error: "Amount is required" }).min(1, "Amount must be positive"),
-  paymentMode: z.string(),
+  paymentMode: z.enum([
+    "CASH",
+    "CHEQUE",
+    "DD",
+    "UPI",
+    "NEFT",
+    "RTGS",
+    "IMPS",
+  ]),
   transactionId: z.string().optional(),
   chequeNumber: z.string().optional(),
   chequeDate: z.string().optional(),
@@ -123,7 +140,7 @@ export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Category</Label>
-          <Select onValueChange={(v) => setValue("category", v as string)} defaultValue="GENERAL">
+          <Select onValueChange={(v) => setValue("category", v as DonationFormData["category"])} defaultValue="GENERAL">
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="GENERAL">General</SelectItem>
@@ -152,7 +169,7 @@ export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId
         <div className="space-y-2">
           <Label>Payment Mode</Label>
           <Select
-            onValueChange={(v) => { setValue("paymentMode", v as string); setPaymentMode(v as string) }}
+            onValueChange={(v) => { setValue("paymentMode", v as DonationFormData["paymentMode"]); setPaymentMode(v) }}
             defaultValue="CASH"
           >
             <SelectTrigger><SelectValue /></SelectTrigger>
