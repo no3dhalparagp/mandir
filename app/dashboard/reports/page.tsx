@@ -79,6 +79,13 @@ export default async function ReportsPage() {
       href: "/dashboard/reports/passbook",
       icon: BookOpen,
     },
+    {
+      title: "Bank Passbook",
+      description:
+        "View bank-wise deposits with verification status and collection details.",
+      href: "/dashboard/reports/bank-passbook",
+      icon: BookOpen,
+    },
   ];
 
   return (

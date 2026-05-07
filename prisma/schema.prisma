@@ -265,6 +265,8 @@ model BankAccount {
   assets          AssetRegister[]
   chequeBooks     ChequeBook[]
   chequeLeaves    ChequeBookLeaf[]
+  bankPassbooks   BankPassbook[]
+  depositVerifications DepositVerification[]
 }
 
 // ─── Fund Transfer between accounts ──────────────────────────────────────────
@@ -307,6 +309,7 @@ model Member {
   collections MemberCollection[]
   donations   Donation[]         @relation("CollectedByMember")
   memberAccount MemberAccount?
+  depositVerifications DepositVerification[]
 }
 
 // ─── Donations ────────────────────────────────────────────────────────────────
@@ -723,4 +726,67 @@ model Passbook {
   @@index([memberAccountId])
   @@index([date])
   @@index([createdAt])
+}
+
+// ─── Bank Passbook ────────────────────────────────────────────────────────────
+
+model BankPassbook {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  date              DateTime
+  description       String
+  referenceType     String   // "DONATION", "DEPOSIT", "WITHDRAWAL", "TRANSFER_IN", "TRANSFER_OUT", "EXPENSE"
+  referenceId       String?
+  debit             Float    @default(0)  // Money going out
+  credit            Float    @default(0) // Money coming in
+  balance           Float
+  isVerified        Boolean  @default(false)
+  verifiedAt        DateTime?
+  verifiedBy        String?  @db.ObjectId // User ID
+  createdAt         DateTime @default(now())
+
+  bankAccountId     String   @db.ObjectId
+  bankAccount       BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  @@index([bankAccountId])
+  @@index([date])
+  @@index([isVerified])
+  @@index([createdAt])
+}
+
+// ─── Deposit Verification ─────────────────────────────────────────────────────
+
+model DepositVerification {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  depositAmount     Float
+  depositDate       DateTime
+  status            String   @default("PENDING") // "PENDING", "VERIFIED", "REJECTED", "RECONCILED"
+  
+  collectedByName   String?  // Member name who collected
+  collectedMemberId String?  @db.ObjectId
+  member            Member?  @relation(fields: [collectedMemberId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  bankAccountId     String   @db.ObjectId
+  bankAccount       BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  
+  receiptNo         String?
+  notes             String?
+  
+  verifiedAt        DateTime?
+  verifiedBy        String?  @db.ObjectId // User ID
+  rejectionReason   String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([bankAccountId])
+  @@index([status])
+  @@index([depositDate])
+  @@index([collectedMemberId])
+}
+
+enum DepositStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  RECONCILED
 }
