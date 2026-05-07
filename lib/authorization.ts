@@ -45,8 +45,6 @@ export async function checkMinRole(minRole: RoleType) {
   return hasMinRole(user.role, minRole)
 }
 
-
-
 type PermissionModule = keyof typeof PERMISSIONS
 type PermissionAction = string
 
@@ -56,14 +54,15 @@ export async function hasPermission(module: PermissionModule, action: Permission
   const modulePerms = PERMISSIONS[module]
   const allowedRoles = modulePerms[action as keyof typeof modulePerms]
   if (!allowedRoles) return false
-  return hasRole(user.role, allowedRoles)
+  // ✅ convert readonly array to mutable
+  return hasRole(user.role, [...allowedRoles])
 }
 
 export async function requirePermission(module: PermissionModule, action: PermissionAction) {
   const user = await requireAuth()
   const modulePerms = PERMISSIONS[module]
   const allowedRoles = modulePerms[action as keyof typeof modulePerms]
-  if (!allowedRoles || !hasRole(user.role, allowedRoles)) {
+  if (!allowedRoles || !hasRole(user.role, [...allowedRoles])) {
     throw new Error("Insufficient permissions")
   }
   return user
