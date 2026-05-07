@@ -164,6 +164,16 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Security fields
+  lastLoginAt      DateTime?
+  lastLoginIp      String?
+  lastLoginDevice  String?
+  loginAttempts    Int       @default(0)
+  lockedUntil      DateTime?
+  passwordChangedAt DateTime?
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?
+
   approvedExpenses       Expense[]               @relation("ApprovedExpenses")
   verifiedCollections    MemberCollection[]      @relation("VerifiedCollections")
   reconciliations        BankReconciliation[]    @relation("ReconciledBy")
@@ -171,6 +181,8 @@ model User {
   accountingTransactions AccountingTransaction[]
   bookClosures           BookClosure[]           @relation("BookClosedBy")
   auditLogs              AuditLog[]
+  loginHistories         LoginHistory[]
+  activeSessions         ActiveSession[]
 }
 
 // ─── Chart of Accounts ─────────────────────────────────────────────────────────
@@ -625,4 +637,54 @@ model BookClosure {
 
   @@unique([closureType, periodStart, periodEnd])
   @@index([periodStart, periodEnd])
+}
+
+// ─── Login History ────────────────────────────────────────────────────────────
+
+model LoginHistory {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String
+  device    String?
+  userAgent String?
+  success   Boolean  @default(true)
+  reason    String?  // For failed attempts
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ─── Active Session ───────────────────────────────────────────────────────────
+
+model ActiveSession {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  ipAddress String
+  device    String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  lastActivityAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─── User Invite ──────────────────────────────────────────────────────────────
+
+model UserInvite {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  role      Role     @default(VIEWER)
+  token     String   @unique
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
 }
