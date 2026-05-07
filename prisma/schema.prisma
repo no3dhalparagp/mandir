@@ -559,7 +559,7 @@ model LedgerEntry {
 
   referenceId     String?
 
-  referenceType   ReferenceType?
+  referenceType   String?
 
   runningBalance  Float @default(0)
 
