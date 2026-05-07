@@ -13,6 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { createExpense } from "@/app/dashboard/expenses/actions"
 
+// ✅ Define valid payment modes to match the server-side PaymentMode enum
+const PAYMENT_MODES = [
+  "CASH", "UPI", "CHEQUE", "NEFT", "RTGS", "DD", "IMPS"
+] as const;
+
 const expenseSchema = z.object({
   title: z.string().min(2, "Title is required."),
   category: z.enum([
@@ -30,7 +35,7 @@ const expenseSchema = z.object({
   amount: z.number({ error: "Amount is required" }).min(1, "Amount must be positive"),
   vendorName: z.string().optional(),
   vendorMobile: z.string().optional(),
-  paymentMode: z.string(),
+  paymentMode: z.enum(PAYMENT_MODES), // ✅ was z.string()
   chequeNumber: z.string().optional(),
   chequeDate: z.string().optional(),
   transactionId: z.string().optional(),
@@ -57,7 +62,7 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
 
   function onSubmit(data: ExpenseFormData) {
     startTransition(async () => {
-      const result = await createExpense(data)
+      const result = await createExpense(data) // ✅ type now matches exactly
       if (result.error) toast.error(result.error)
       else { toast.success("Expense recorded!"); onSuccess() }
     })
@@ -125,8 +130,9 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
           <Label>Payment Mode</Label>
           <Select
             onValueChange={(v) => {
-              setValue("paymentMode", v as string);
-              setPaymentMode(v as string);
+              // ✅ Cast to the exact union type from the schema
+              setValue("paymentMode", v as ExpenseFormData["paymentMode"]);
+              setPaymentMode(v);
             }}
             defaultValue="CASH"
           >
