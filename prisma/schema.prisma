@@ -545,25 +545,38 @@ model Event {
 // ─── Ledger ───────────────────────────────────────────────────────────────────
 
 model LedgerEntry {
-  id            String                @id @default(auto()) @map("_id") @db.ObjectId
-  date          DateTime              @default(now())
-  type          LedgerTransactionType @default(INCOME)
-  amount        Float
-  description   String
-  referenceType String? // "DONATION", "EXPENSE", "TRANSFER", "MEMBER_DEPOSIT"
-  referenceId   String?
+  id              String   @id @default(cuid())
 
-  accountId String      @db.ObjectId
-  account   BankAccount @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accountId       String
 
-  runningBalance Float?
-  isReconciled   Boolean   @default(false)
-  reconciledAt   DateTime?
+  account         BankAccount @relation(fields: [accountId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  type            LedgerTransactionType
+
+  amount          Float
+
+  description     String
+
+  referenceId     String?
+
+  referenceType   ReferenceType?
+
+  runningBalance  Float @default(0)
+
+  date            DateTime @default(now())
+
+  createdAt       DateTime @default(now())
+
+  updatedAt       DateTime @updatedAt
+
+  /* ----------------------------------- */
+  /* CHEQUE CLEARING                     */
+  /* ----------------------------------- */
+
+  isCleared       Boolean @default(true)
+
+  clearedAt       DateTime?
 }
-
 // ─── Bank Reconciliation ──────────────────────────────────────────────────────
 
 model BankReconciliation {
