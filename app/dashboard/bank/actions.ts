@@ -48,49 +48,6 @@ const debitTypes: LedgerTransactionType[] =
     "TRANSFER_OUT",
   ]
 
-export async function getAccountBalance(
-  accountId: string
-) {
-  const entries =
-    await prisma.ledgerEntry.findMany({
-      where: {
-        accountId,
-
-        OR: [
-          {
-            isCleared: true,
-          },
-          {
-            isCleared: null,
-          },
-        ],
-      },
-
-      orderBy: [
-        {
-          date: "asc",
-        },
-        {
-          createdAt: "asc",
-        },
-      ],
-    })
-
-  let balance = 0
-
-  for (const entry of entries) {
-    const isDebit = [
-      "EXPENSE",
-      "TRANSFER_OUT",
-    ].includes(entry.type)
-
-    balance = isDebit
-      ? balance - Number(entry.amount)
-      : balance + Number(entry.amount)
-  }
-
-  return balance
-}
 
 /* ======================================================
    RECALCULATE RUNNING BALANCE
@@ -379,16 +336,6 @@ export async function recalculateBalances(
 }
 
 
-export async function getAccountBalance(accountId: string) {
-  // The running balance is stored on the latest ledger entry for the account
-  const lastEntry = await prisma.ledgerEntry.findFirst({
-    where: { accountId },
-    orderBy: { date: "desc" },
-    select: { runningBalance: true },
-  })
-
-  return lastEntry?.runningBalance ?? 0
-}
 
 /* ======================================================
    BULK: ADD VERIFIED COLLECTIONS TO CASH ACCOUNT
