@@ -18,7 +18,7 @@ const schema = z.object({
   eventType: z.enum(["PUJA", "FESTIVAL", "MEETING", "OTHER"]),
   date: z.string().min(1),
   endDate: z.string().optional(),
-  budget: z.coerce.number().optional(),
+  budget: z.number({ error: "Invalid budget" }).optional(),
   organizer: z.string().optional(),
   sponsorDetails: z.string().optional(),
   notes: z.string().optional(),
@@ -70,7 +70,11 @@ export function AddEventDialog() {
             </div>
             <div className="space-y-2">
               <Label>Budget (₹)</Label>
-              <Input type="number" {...register("budget")} />
+              <Input
+                type="number"
+                step="0.01"
+                {...register("budget", { valueAsNumber: true })}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
