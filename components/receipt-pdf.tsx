@@ -135,7 +135,7 @@ export function ReceiptDocument({ data }: { data: ReceiptData }) {
             <Text style={styles.headerSubtitle}>Official Donation Receipt</Text>
           </View>
           {data.qrCodeDataUrl && (
-            <Image src={data.qrCodeDataUrl} style={{ width: 50, height: 50 }} alt="QR Code" />
+            <Image src={data.qrCodeDataUrl} style={{ width: 50, height: 50 }}  />
           )}
         </View>
 
