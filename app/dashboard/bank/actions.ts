@@ -226,45 +226,7 @@ export async function createBankAccount(
   }
 }
 
-/* ======================================================
-   GET ACCOUNT BALANCE
-====================================================== */
 
-export async function getAccountBalance(
-  accountId: string
-) {
-  const entries =
-    await prisma.ledgerEntry.findMany({
-      where: {
-        accountId,
-      },
-
-      orderBy: [
-        {
-          date: "asc",
-        },
-        {
-          createdAt: "asc",
-        },
-      ],
-    })
-
-  let balance = 0
-
-  for (const entry of entries) {
-    const amount = Number(entry.amount)
-
-    if (
-      debitTypes.includes(entry.type)
-    ) {
-      balance -= amount
-    } else {
-      balance += amount
-    }
-  }
-
-  return balance
-}
 
 /* ======================================================
    ADD VERIFIED COLLECTION TO CASH ACCOUNT
@@ -349,3 +311,14 @@ export async function recalculateBalances(
   }
 }
 
+
+export async function getAccountBalance(accountId: string) {
+  // The running balance is stored on the latest ledger entry for the account
+  const lastEntry = await prisma.ledgerEntry.findFirst({
+    where: { accountId },
+    orderBy: { date: "desc" },
+    select: { runningBalance: true },
+  })
+
+  return lastEntry?.runningBalance ?? 0
+}
