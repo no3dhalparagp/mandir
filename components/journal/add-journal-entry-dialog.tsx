@@ -22,7 +22,7 @@ import { createJournalEntry } from "@/app/dashboard/journal/actions"
 const schema = z.object({
   debitAccountId: z.string().min(1, "Select debit account"),
   creditAccountId: z.string().min(1, "Select credit account"),
-  amount: z.coerce.number().min(1),
+  amount: z.number({ required_error: "Amount is required" }).min(1, "Amount must be positive"), // ✅ changed from z.coerce.number()
   date: z.date(),
   description: z.string().min(3),
   referenceNo: z.string().optional(),
@@ -105,7 +105,7 @@ export function AddJournalEntryDialog({ accounts }: { accounts: { id: string; na
 
           <div className="space-y-2">
             <Label>Amount (₹) *</Label>
-            <Input type="number" step="0.01" {...register("amount")} />
+            <Input type="number" step="0.01" {...register("amount", { valueAsNumber: true })} /> {/* ✅ converts string to number */}
             {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
           </div>
 
