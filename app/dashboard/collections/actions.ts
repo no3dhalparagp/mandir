@@ -11,12 +11,19 @@ import {
   requireAuth,
 } from "@/lib/authorization"
 
+/* -------------------------------------------------------------------------- */
+/*                         Recalculate Account Balance                        */
+/* -------------------------------------------------------------------------- */
+
 async function recalculateBalancesForAccount(
   accountId: string
 ) {
   const entries = await prisma.ledgerEntry.findMany({
     where: { accountId },
-    orderBy: { date: "asc" },
+
+    orderBy: {
+      date: "asc",
+    },
   })
 
   let balance = 0
@@ -32,7 +39,10 @@ async function recalculateBalancesForAccount(
       : balance + entry.amount
 
     await prisma.ledgerEntry.update({
-      where: { id: entry.id },
+      where: {
+        id: entry.id,
+      },
+
       data: {
         runningBalance: balance,
       },
@@ -41,11 +51,14 @@ async function recalculateBalancesForAccount(
 }
 
 /* -------------------------------------------------------------------------- */
-/*                               Pending Collections                          */
+/*                           Pending Collections                              */
 /* -------------------------------------------------------------------------- */
 
 export async function getPendingCollections() {
-  await requirePermission("collections", "read")
+  await requirePermission(
+    "collections",
+    "read"
+  )
 
   return prisma.memberCollection.findMany({
     where: {
@@ -67,11 +80,11 @@ export async function getPendingCollections() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                All Collections                             */
+/*                             All Collections                                */
 /* -------------------------------------------------------------------------- */
 
 export async function getAllCollections() {
-  // Only require login
+  // Only login required
   await requireAuth()
 
   const session = await auth()
@@ -89,7 +102,7 @@ export async function getAllCollections() {
       },
     })
 
-    // Normal members only see their own collections
+    // Normal members only see own collections
     if (
       user &&
       ![
@@ -113,7 +126,9 @@ export async function getAllCollections() {
 
     include: {
       member: true,
+
       donation: true,
+
       depositedToAccount: true,
 
       verifiedBy: {
@@ -132,7 +147,7 @@ export async function getAllCollections() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                Member Ledger                               */
+/*                              Member Ledger                                 */
 /* -------------------------------------------------------------------------- */
 
 export async function getMemberLedger(
@@ -163,33 +178,44 @@ export async function getMemberLedger(
       },
     })
 
+  /* ---------------------------------------------------------------------- */
+  /*                                 Totals                                 */
+  /* ---------------------------------------------------------------------- */
+
+  // Total collection made
   const totalCollected = collections.reduce(
     (s, c) => s + c.collectedAmount,
     0
   )
 
+  // Deposited amount
+  // DISCREPANT excluded
   const totalDeposited = collections
     .filter((c) =>
-      ["DEPOSITED", "VERIFIED", "DISCREPANT"].includes(
+      ["DEPOSITED", "VERIFIED"].includes(
         c.status
       )
     )
     .reduce(
       (s, c) =>
         s +
-        (c.verifiedAmount ?? c.collectedAmount),
+        (c.verifiedAmount ??
+          c.collectedAmount),
       0
     )
 
+  // Successfully verified amount
   const totalVerified = collections
     .filter((c) => c.status === "VERIFIED")
     .reduce(
       (s, c) =>
         s +
-        (c.verifiedAmount ?? c.collectedAmount),
+        (c.verifiedAmount ??
+          c.collectedAmount),
       0
     )
 
+  // Still with member
   const pendingDeposit = collections
     .filter((c) => c.status === "COLLECTED")
     .reduce(
@@ -197,6 +223,7 @@ export async function getMemberLedger(
       0
     )
 
+  // Submitted but not verified
   const pendingVerification = collections
     .filter((c) => c.status === "DEPOSITED")
     .reduce(
@@ -204,22 +231,60 @@ export async function getMemberLedger(
       0
     )
 
+  /* ---------------------------------------------------------------------- */
+  /*                         Discrepancy / Recovery                          */
+  /* ---------------------------------------------------------------------- */
+
+  // Recovery amount from discrepancy
+  const recollectionRequired = collections
+    .filter((c) => c.status === "DISCREPANT")
+    .reduce((s, c) => {
+      const verified = c.verifiedAmount ?? 0
+
+      return (
+        s +
+        (c.collectedAmount - verified)
+      )
+    }, 0)
+
+  // Full discrepant collection list
+  const discrepantCollections =
+    collections.filter(
+      (c) => c.status === "DISCREPANT"
+    )
+
+  /* ---------------------------------------------------------------------- */
+  /*                              Outstanding                               */
+  /* ---------------------------------------------------------------------- */
+
   const outstanding =
-    totalCollected - totalVerified
+    pendingDeposit +
+    pendingVerification +
+    recollectionRequired
 
   return {
     collections,
+
     totalCollected,
+
     totalDeposited,
+
     totalVerified,
+
     pendingDeposit,
+
     pendingVerification,
+
+    recollectionRequired,
+
+    discrepantCollections,
+
     outstanding,
   }
 }
 
 /* -------------------------------------------------------------------------- */
-/*                           Mark Collection Deposited                        */
+/*                        Mark Collection Deposited                           */
 /* -------------------------------------------------------------------------- */
 
 export async function markCollectionDeposited(
@@ -264,7 +329,7 @@ export async function markCollectionDeposited(
 }
 
 /* -------------------------------------------------------------------------- */
-/*                             Verify Collection                              */
+/*                            Verify Collection                               */
 /* -------------------------------------------------------------------------- */
 
 export async function verifyCollection(
@@ -337,6 +402,10 @@ export async function verifyCollection(
       collection.depositedToAccount?.name ??
       collection.donation.account?.name
 
+    /* ---------------------------------------------------------------------- */
+    /*                         Create Ledger Entry                            */
+    /* ---------------------------------------------------------------------- */
+
     if (!hasDiscrepancy && targetAccountId) {
       const existingEntry =
         await prisma.ledgerEntry.findFirst({
@@ -371,6 +440,10 @@ export async function verifyCollection(
         )
       }
     }
+
+    /* ---------------------------------------------------------------------- */
+    /*                            Updated Balance                             */
+    /* ---------------------------------------------------------------------- */
 
     let currentBalance = undefined
 
