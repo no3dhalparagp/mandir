@@ -10,6 +10,7 @@ import {
 } from "@prisma/client"
 
 import { requireAuth, requirePermission } from "@/lib/authorization"
+import { assertDateNotClosed } from "@/lib/book-closure"
 
 /* ======================================================
    SCHEMA
@@ -246,6 +247,7 @@ export async function addVerifiedCollectionToCashAccount(
   }
 ) {
   try {
+    await assertDateNotClosed(new Date(), "Collection posting to cash book")
     await prisma.ledgerEntry.create({
       data: {
         accountId: cashAccountId,
@@ -335,6 +337,7 @@ export async function bulkAddVerifiedCollectionsToCashAccount({
   collectionIds: string[]
 }) {
   try {
+    await assertDateNotClosed(new Date(), "Collection posting to cash book")
     const currentUser = await requireAuth()
     await requirePermission("bank", "transfer")
     await requirePermission("collections", "deposit")
@@ -362,8 +365,9 @@ export async function bulkAddVerifiedCollectionsToCashAccount({
       const collections = await tx.memberCollection.findMany({
         where: {
           id: { in: collectionIds },
-          status: "VERIFIED",
+          status: { in: ["VERIFIED", "DISCREPANT"] },
           verifiedById: currentUser.id,
+          verifiedAmount: { not: null, gt: 0 },
         },
         include: {
           member: true,

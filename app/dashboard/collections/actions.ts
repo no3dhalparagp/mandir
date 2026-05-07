@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
-import { AccountType } from "@prisma/client"
+import { AccountType, Prisma } from "@prisma/client"
 
 import {
   getAccountBalance,
@@ -14,6 +14,10 @@ import {
   requirePermission,
   requireAuth,
 } from "@/lib/authorization"
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
 
 /* -------------------------------------------------------------------------- */
 /*                         Recalculate Account Balance                        */
@@ -67,7 +71,7 @@ export async function getAllCollections() {
 
   const session = await auth()
 
-  let whereClause: any = {}
+  let whereClause: Prisma.MemberCollectionWhereInput = {}
 
   if (session?.user?.id) {
     const user = await prisma.user.findUnique({
@@ -135,7 +139,7 @@ export async function getAllCollections() {
   return collections.map((c) => ({
     ...c,
     isInCashAccount: cashPostedIds.has(c.id),
-    canSendToCash: !!session?.user?.id && c.verifiedById === session.user.id,
+    canSendToCash: !!session?.user?.id && c.verifiedById === session.user.id && c.verifiedAmount !== null && c.verifiedAmount > 0,
   }))
 }
 
@@ -205,6 +209,89 @@ export async function getMemberLedger(memberId: string) {
 }
 
 /* -------------------------------------------------------------------------- */
+/*                          Get Collections By Collector                      */
+/* -------------------------------------------------------------------------- */
+
+export async function getCollectionsByCollector() {
+  await requirePermission("collections", "read")
+
+  const collections = await prisma.memberCollection.findMany({
+    where: {
+      status: { in: ["COLLECTED"] },
+    },
+    include: {
+      member: true,
+      donation: true,
+    },
+    orderBy: { collectedDate: "desc" },
+  })
+
+  const groupedByMember = new Map<
+    string,
+    {
+      member: { id: string; name: string; memberId: string }
+      collections: typeof collections
+      totalAmount: number
+    }
+  >()
+
+  for (const collection of collections) {
+    const memberKey = collection.memberId
+    if (!groupedByMember.has(memberKey)) {
+      groupedByMember.set(memberKey, {
+        member: {
+          id: collection.member.id,
+          name: collection.member.name,
+          memberId: collection.member.memberId,
+        },
+        collections: [],
+        totalAmount: 0,
+      })
+    }
+
+    const memberData = groupedByMember.get(memberKey)!
+    memberData.collections.push(collection)
+    memberData.totalAmount += collection.collectedAmount
+  }
+
+  return Array.from(groupedByMember.values())
+}
+
+/* -------------------------------------------------------------------------- */
+/*                         Bulk Send To Accountant                            */
+/* -------------------------------------------------------------------------- */
+
+export async function bulkSendToAccountant(collectionIds: string[], depositedToAccountId: string) {
+  try {
+    await requirePermission("collections", "deposit")
+    await requireAuth()
+
+    if (collectionIds.length === 0) {
+      return { error: "No collections selected." }
+    }
+
+    await prisma.memberCollection.updateMany({
+      where: {
+        id: { in: collectionIds },
+        status: "COLLECTED",
+      },
+      data: {
+        status: "DEPOSITED",
+        depositedToAccountId,
+        depositedDate: new Date(),
+      },
+    })
+
+    revalidatePath("/dashboard/collections")
+    return { success: true }
+  } catch (error: unknown) {
+    return {
+      error: getErrorMessage(error, "Failed to send to accountant."),
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /*                        Mark Collection Deposited                           */
 /* -------------------------------------------------------------------------- */
 
@@ -244,11 +331,11 @@ export async function markCollectionDeposited(
       await prisma.memberCollection.update({
         where: { id: collectionId },
         data: {
-          collectedAmount: remainingAmount,
           status: "DEPOSITED",
           depositedToAccountId,
           depositedDate: new Date(),
           depositSlipNo,
+          collectedAmount: remainingAmount,
           verifiedAmount: null,
           verifiedById: null,
           verifiedAt: null,
@@ -272,9 +359,9 @@ export async function markCollectionDeposited(
 
     revalidatePath("/dashboard/collections")
     return { success: true }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
-      error: error.message || "Failed to mark as deposited.",
+      error: getErrorMessage(error, "Failed to mark as deposited."),
     }
   }
 }
@@ -322,11 +409,11 @@ export async function verifyCollection(
     /*                           Post To Cash Account                         */
     /* ---------------------------------------------------------------------- */
 
-    let targetAccountId: string | undefined
     let targetAccountName: string | undefined
     let currentBalance = undefined
 
-    if (!hasDiscrepancy) {
+    // Post verified amount to cash account even if there's a discrepancy
+    if (verifiedAmount > 0) {
       // Find default cash-in-hand account
       const cashAccount = await prisma.bankAccount.findFirst({
         where: { accountType: AccountType.CASH_IN_HAND },
@@ -346,7 +433,6 @@ export async function verifyCollection(
         collectorName: collection.member?.name ?? undefined,
       })
 
-      targetAccountId = cashAccount.id
       targetAccountName = cashAccount.name
 
       currentBalance = await getAccountBalance(cashAccount.id)
@@ -361,9 +447,9 @@ export async function verifyCollection(
       balance: currentBalance,
       accountName: targetAccountName,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
-      error: error.message || "Failed to verify collection.",
+      error: getErrorMessage(error, "Failed to verify collection."),
     }
   }
 }

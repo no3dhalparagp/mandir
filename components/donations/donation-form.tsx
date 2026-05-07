@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useForm, Controller } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Loader2, User, Phone, MapPin, Banknote, CreditCard, Tag, FileText, UserCheck, Building2 } from "lucide-react"
@@ -9,7 +9,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import {
   Select,
   SelectContent,
@@ -92,12 +92,6 @@ interface DonationFormProps {
   isAdminOrAccountant?: boolean | null
 }
 
-// -------------------- Reusable helper to render form field errors --------------------
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null
-  return <p className="mt-1 text-xs text-destructive">{message}</p>
-}
-
 export function DonationForm({
   onSuccess,
   accounts,
@@ -108,14 +102,7 @@ export function DonationForm({
   const [isPending, startTransition] = React.useTransition()
   const isAdmin = !!isAdminOrAccountant
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<DonationFormData>({
+  const form = useForm<DonationFormData>({
     resolver: zodResolver(donationSchema),
     defaultValues: {
       category: "GENERAL",
@@ -124,18 +111,18 @@ export function DonationForm({
     },
   })
 
-  const watchedPaymentMode = watch("paymentMode")
+  const watchedPaymentMode = form.watch("paymentMode")
   const isCASH = watchedPaymentMode === "CASH"
   const showChequeFields = watchedPaymentMode === "CHEQUE" || watchedPaymentMode === "DD"
   const showTxnField = ["UPI", "NEFT", "RTGS", "IMPS"].includes(watchedPaymentMode)
 
   // Reset account and auto-assign collector when payment mode changes
   React.useEffect(() => {
-    setValue("accountId", "")
+    form.setValue("accountId", "")
     if (isCASH && !isAdmin && loggedInMemberId) {
-      setValue("collectedByMemberId", loggedInMemberId)
+      form.setValue("collectedByMemberId", loggedInMemberId)
     }
-  }, [watchedPaymentMode, isCASH, isAdmin, loggedInMemberId, setValue])
+  }, [watchedPaymentMode, isCASH, isAdmin, loggedInMemberId, form])
 
   const filteredAccounts = React.useMemo(
     () =>
@@ -163,7 +150,8 @@ export function DonationForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-h-[75vh] overflow-y-auto pr-2">
+    <Form {...form}>
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-h-[75vh] overflow-y-auto pr-2">
       {/* ---- Donor Information Card ---- */}
       <div className="rounded-xl border bg-card p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
@@ -171,28 +159,28 @@ export function DonationForm({
           <h3 className="text-sm font-semibold">Donor Information</h3>
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="donorName" className="flex items-center">
-              Donor Name <span className="text-destructive ml-0.5">*</span>
-            </Label>
-            <Input id="donorName" placeholder="Full name" {...register("donorName")} />
-            <FieldError message={errors.donorName?.message} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="mobileNumber">
-              <Phone className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />
-              Mobile Number
-            </Label>
-            <Input id="mobileNumber" placeholder="10-digit number" {...register("mobileNumber")} />
-          </div>
+          <FormField control={form.control} name="donorName" render={({ field }) => (
+            <FormItem className="space-y-1.5">
+              <FormLabel className="flex items-center">Donor Name <span className="text-destructive ml-0.5">*</span></FormLabel>
+              <FormControl><Input placeholder="Full name" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="mobileNumber" render={({ field }) => (
+            <FormItem className="space-y-1.5">
+              <FormLabel><Phone className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />Mobile Number</FormLabel>
+              <FormControl><Input placeholder="10-digit number" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
         </div>
-        <div className="mt-4 space-y-1.5">
-          <Label htmlFor="address">
-            <MapPin className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />
-            Address
-          </Label>
-          <Input id="address" placeholder="Address (optional)" {...register("address")} />
-        </div>
+        <FormField control={form.control} name="address" render={({ field }) => (
+          <FormItem className="mt-4 space-y-1.5">
+            <FormLabel><MapPin className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />Address</FormLabel>
+            <FormControl><Input placeholder="Address (optional)" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
       </div>
 
       {/* ---- Payment Details Card ---- */}
@@ -202,115 +190,105 @@ export function DonationForm({
           <h3 className="text-sm font-semibold">Payment Details</h3>
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="category">
-              <Tag className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />
-              Category
-            </Label>
-            <Controller
-              name="category"
-              control={control}
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger id="category" className="w-full">
+          <FormField control={form.control} name="category" render={({ field }) => (
+            <FormItem className="space-y-1.5">
+              <FormLabel><Tag className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />Category</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat.charAt(0) + cat.slice(1).toLowerCase().replace("_", " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="amount" className="flex items-center">
+                </FormControl>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat.charAt(0) + cat.slice(1).toLowerCase().replace("_", " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="amount" render={({ field }) => (
+            <FormItem className="space-y-1.5">
+            <FormLabel className="flex items-center">
               Amount <span className="text-destructive ml-0.5">*</span>
-            </Label>
+            </FormLabel>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
                 ₹
               </span>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                className="pl-8"
-                {...register("amount", { valueAsNumber: true })}
-              />
+              <FormControl>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="pl-8"
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                />
+              </FormControl>
             </div>
-            <FieldError message={errors.amount?.message} />
-          </div>
+            <FormMessage />
+          </FormItem>
+          )} />
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4 mt-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="paymentMode">
-              <CreditCard className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />
-              Payment Mode
-            </Label>
-            <Controller
-              name="paymentMode"
-              control={control}
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger id="paymentMode" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CASH">Cash</SelectItem>
-                    <SelectItem value="CHEQUE">Cheque</SelectItem>
-                    {isAdmin && (
-                      <>
-                        <SelectItem value="UPI">UPI</SelectItem>
-                        <SelectItem value="NEFT">NEFT</SelectItem>
-                        <SelectItem value="RTGS">RTGS</SelectItem>
-                        <SelectItem value="IMPS">IMPS</SelectItem>
-                        <SelectItem value="DD">Demand Draft</SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="accountId" className="flex items-center">
+          <FormField control={form.control} name="paymentMode" render={({ field }) => (
+            <FormItem className="space-y-1.5">
+              <FormLabel><CreditCard className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />Payment Mode</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl><SelectTrigger className="w-full"><SelectValue /></SelectTrigger></FormControl>
+                <SelectContent>
+                  <SelectItem value="CASH">Cash</SelectItem>
+                  <SelectItem value="CHEQUE">Cheque</SelectItem>
+                  {isAdmin && (
+                    <>
+                      <SelectItem value="UPI">UPI</SelectItem>
+                      <SelectItem value="NEFT">NEFT</SelectItem>
+                      <SelectItem value="RTGS">RTGS</SelectItem>
+                      <SelectItem value="IMPS">IMPS</SelectItem>
+                      <SelectItem value="DD">Demand Draft</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="accountId" render={({ field }) => (
+            <FormItem className="space-y-1.5">
+            <FormLabel className="flex items-center">
               <Building2 className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />
               Deposit to Account
               {disableDepositAccount && (
                 <span className="text-xs text-muted-foreground ml-1">(disabled for cash)</span>
               )}
-            </Label>
-            <Controller
-              name="accountId"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  onValueChange={(v) => field.onChange(v === "__none" ? "" : v)}
-                  value={field.value || "__none"}
-                  disabled={disableDepositAccount}
-                >
-                  <SelectTrigger id="accountId" className="w-full">
-                    <SelectValue placeholder="Select account…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">— Direct —</SelectItem>
-                    {filteredAccounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            <FieldError message={errors.accountId?.message} />
-          </div>
+            </FormLabel>
+            <Select
+              onValueChange={(v) => field.onChange(v === "__none" ? "" : v)}
+              value={field.value || "__none"}
+              disabled={disableDepositAccount}
+            >
+              <FormControl>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select account…" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="__none">— Direct —</SelectItem>
+                {filteredAccounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+          )} />
         </div>
 
         {/* Cheque / DD specific fields */}
@@ -318,16 +296,28 @@ export function DonationForm({
           <div className="mt-4 p-4 rounded-lg bg-muted/30 border border-dashed">
             <div className="grid sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="chequeNumber">Cheque No.</Label>
-                <Input id="chequeNumber" placeholder="123456" {...register("chequeNumber")} />
+                <FormField control={form.control} name="chequeNumber" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cheque No.</FormLabel>
+                    <FormControl><Input placeholder="123456" {...field} /></FormControl>
+                  </FormItem>
+                )} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="chequeDate">Cheque Date</Label>
-                <Input id="chequeDate" type="date" {...register("chequeDate")} />
+                <FormField control={form.control} name="chequeDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cheque Date</FormLabel>
+                    <FormControl><Input type="date" {...field} /></FormControl>
+                  </FormItem>
+                )} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="bankNameCheque">Bank Name</Label>
-                <Input id="bankNameCheque" placeholder="Bank name" {...register("bankNameCheque")} />
+                <FormField control={form.control} name="bankNameCheque" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bank Name</FormLabel>
+                    <FormControl><Input placeholder="Bank name" {...field} /></FormControl>
+                  </FormItem>
+                )} />
               </div>
             </div>
           </div>
@@ -335,14 +325,13 @@ export function DonationForm({
 
         {/* Transaction ID for digital payments */}
         {showTxnField && (
-          <div className="mt-4 space-y-1.5">
-            <Label htmlFor="transactionId">Transaction / Reference ID</Label>
-            <Input
-              id="transactionId"
-              {...register("transactionId")}
-              placeholder="UTR / Ref Number"
-            />
-          </div>
+          <FormField control={form.control} name="transactionId" render={({ field }) => (
+            <FormItem className="mt-4 space-y-1.5">
+              <FormLabel>Transaction / Reference ID</FormLabel>
+              <FormControl><Input {...field} placeholder="UTR / Ref Number" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
         )}
       </div>
 
@@ -352,46 +341,47 @@ export function DonationForm({
           <UserCheck className="h-5 w-5 text-muted-foreground" />
           <h3 className="text-sm font-semibold">Collection & Notes</h3>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="collectedByMemberId">Collected by Member</Label>
-          <Controller
-            name="collectedByMemberId"
-            control={control}
-            render={({ field }) => (
-              <Select
-                onValueChange={(v) => field.onChange(v === "__none" ? "" : v)}
-                value={field.value || "__none"}
-                disabled={!!loggedInMemberId && !isAdmin}
-              >
-                <SelectTrigger id="collectedByMemberId" className="w-full">
-                  <SelectValue placeholder="Direct receipt (not via member)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none">— Direct Receipt —</SelectItem>
-                  {collectors.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name} ({m.memberId})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
+        <FormField control={form.control} name="collectedByMemberId" render={({ field }) => (
+          <FormItem className="space-y-1.5">
+          <FormLabel>Collected by Member</FormLabel>
+          <Select
+            onValueChange={(v) => field.onChange(v === "__none" ? "" : v)}
+            value={field.value || "__none"}
+            disabled={!!loggedInMemberId && !isAdmin}
+          >
+            <FormControl>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Direct receipt (not via member)" />
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              <SelectItem value="__none">— Direct Receipt —</SelectItem>
+              {collectors.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name} ({m.memberId})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-xs text-muted-foreground mt-1">
             {!!loggedInMemberId && !isAdmin
               ? "Your member profile is automatically selected for cash collection."
               : "If collected by a member, it will need verification before entering the Cash Book."}
           </p>
-          <FieldError message={errors.collectedByMemberId?.message} />
-        </div>
+          <FormMessage />
+          </FormItem>
+        )} />
 
-        <div className="mt-4 space-y-1.5">
-          <Label htmlFor="notes">
-            <FileText className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />
-            Notes
-          </Label>
-          <Input id="notes" placeholder="Any additional notes..." {...register("notes")} />
-        </div>
+        <FormField control={form.control} name="notes" render={({ field }) => (
+          <FormItem className="mt-4 space-y-1.5">
+            <FormLabel>
+              <FileText className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />
+              Notes
+            </FormLabel>
+            <FormControl><Input placeholder="Any additional notes..." {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
       </div>
 
       {/* ---- Submit Button ---- */}
@@ -404,5 +394,6 @@ export function DonationForm({
         {isPending ? "Saving..." : "Save Donation"}
       </Button>
     </form>
+    </Form>
   )
 }

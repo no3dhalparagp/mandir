@@ -8,9 +8,9 @@ import { Loader2, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { createEvent } from "@/app/dashboard/events/actions"
 
 const schema = z.object({
@@ -29,7 +29,7 @@ type FormData = z.infer<typeof schema>
 export function AddEventDialog() {
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormData>({
+  const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { eventType: "PUJA" },
   })
@@ -38,7 +38,7 @@ export function AddEventDialog() {
     startTransition(async () => {
       const res = await createEvent(data)
       if (res.error) toast.error(res.error)
-      else { toast.success("Event created!"); reset(); setOpen(false) }
+      else { toast.success("Event created!"); form.reset(); setOpen(false) }
     })
   }
 
@@ -49,56 +49,94 @@ export function AddEventDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[460px]">
         <DialogHeader><DialogTitle>Create Event / Puja</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
-          <div className="space-y-2">
-            <Label>Event Name *</Label>
-            <Input {...register("name")} />
-            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+        <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-2">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Event Name *</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="eventType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Type</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="PUJA">Puja</SelectItem>
+                      <SelectItem value="FESTIVAL">Festival</SelectItem>
+                      <SelectItem value="MEETING">Meeting</SelectItem>
+                      <SelectItem value="OTHER">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="budget"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Budget (₹)</FormLabel>
+                  <FormControl><Input type="number" step="0.01" value={field.value ?? ""} onChange={(e) => field.onChange(e.target.valueAsNumber)} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select onValueChange={(v) => setValue("eventType", v as "PUJA" | "FESTIVAL" | "MEETING" | "OTHER")} defaultValue="PUJA">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PUJA">Puja</SelectItem>
-                  <SelectItem value="FESTIVAL">Festival</SelectItem>
-                  <SelectItem value="MEETING">Meeting</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Budget (₹)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                {...register("budget", { valueAsNumber: true })}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Start Date *</FormLabel>
+                  <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>End Date</FormLabel>
+                  <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Start Date *</Label>
-              <Input type="date" {...register("date")} />
-            </div>
-            <div className="space-y-2">
-              <Label>End Date</Label>
-              <Input type="date" {...register("endDate")} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Organizer</Label>
-            <Input {...register("organizer")} />
-          </div>
-          <div className="space-y-2">
-            <Label>Sponsor Details</Label>
-            <Input {...register("sponsorDetails")} />
-          </div>
+          <FormField control={form.control} name="organizer" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Organizer</FormLabel>
+              <FormControl><Input {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="sponsorDetails" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Sponsor Details</FormLabel>
+              <FormControl><Input {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
           <Button type="submit" className="w-full" disabled={pending}>
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create Event
           </Button>
         </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )

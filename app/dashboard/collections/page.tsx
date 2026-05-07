@@ -1,21 +1,21 @@
 // File: app/dashboard/collections/page.tsx
 
-import { getAllCollections } from "./actions"
-import { getBankAccounts } from "@/app/dashboard/bank/actions"
+import { getAllCollections, getCollectionsByCollector } from "./actions";
+import { getBankAccounts } from "@/app/dashboard/bank/actions";
 
-import { auth } from "@/auth"
-import { prisma } from "@/lib/prisma"
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { CollectionsTable } from "@/components/collections/collections-table"
+  CollectionsTable,
+  CollectionWithFlags,
+  CollectionsBankAccount,
+} from "@/components/collections/collections-table";
+import { AgentCollectionsOverview } from "@/components/collections/agent-collections-overview";
 
 export default async function CollectionsPage() {
-  const session = await auth()
+  const session = await auth();
 
   const user = session?.user?.id
     ? await prisma.user.findUnique({
@@ -26,64 +26,55 @@ export default async function CollectionsPage() {
           member: true,
         },
       })
-    : null
+    : null;
 
   const isAdminOrAccountant =
     !!user &&
-    [
-      "SUPER_ADMIN",
-      "COMMITTEE_ADMIN",
-      "ACCOUNTANT",
-    ].includes(user.role)
+    ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"].includes(user.role);
 
   /* -------------------------------------------------------------------------- */
   /*                                 Collections                                */
   /* -------------------------------------------------------------------------- */
 
-  const collections = await getAllCollections()
+  const collections = await getAllCollections();
+
+  /* -------------------------------------------------------------------------- */
+  /*                           Agent Collections                                */
+  /* -------------------------------------------------------------------------- */
+
+  const agentCollections = isAdminOrAccountant
+    ? await getCollectionsByCollector()
+    : [];
 
   /* -------------------------------------------------------------------------- */
   /*                               Bank Accounts                                */
   /* -------------------------------------------------------------------------- */
 
-  const accounts = isAdminOrAccountant
-    ? await getBankAccounts()
-    : []
+  const accounts = isAdminOrAccountant ? await getBankAccounts() : [];
 
   /* -------------------------------------------------------------------------- */
   /*                                  Summary                                   */
   /* -------------------------------------------------------------------------- */
 
   const pending = collections.filter((c) =>
-    ["COLLECTED", "DEPOSITED"].includes(c.status)
-  )
+    ["COLLECTED", "DEPOSITED"].includes(c.status),
+  );
 
-  const verified = collections.filter(
-    (c) => c.status === "VERIFIED"
-  )
+  const verified = collections.filter((c) => c.status === "VERIFIED");
 
-  const discrepant = collections.filter(
-    (c) => c.status === "DISCREPANT"
-  )
+  const discrepant = collections.filter((c) => c.status === "DISCREPANT");
 
-  const totalPending = pending.reduce(
-    (s, c) => s + c.collectedAmount,
-    0
-  )
+  const totalPending = pending.reduce((s, c) => s + c.collectedAmount, 0);
 
   const totalVerified = verified.reduce(
-    (s, c) =>
-      s + (c.verifiedAmount ?? c.collectedAmount),
-    0
-  )
+    (s, c) => s + (c.verifiedAmount ?? c.collectedAmount),
+    0,
+  );
 
-  const recollectionRequired = discrepant.reduce(
-    (s, c) => {
-      const verified = c.verifiedAmount ?? 0
-      return s + (c.collectedAmount - verified)
-    },
-    0
-  )
+  const recollectionRequired = discrepant.reduce((s, c) => {
+    const verified = c.verifiedAmount ?? 0;
+    return s + (c.collectedAmount - verified);
+  }, 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -93,15 +84,24 @@ export default async function CollectionsPage() {
 
       <div>
         <h1 className="text-3xl font-bold tracking-tight">
-          {isAdminOrAccountant
-            ? "Member Collections"
-            : "My Collections"}
+          {isAdminOrAccountant ? "Member Collections" : "My Collections"}
         </h1>
 
         <p className="text-muted-foreground">
           Collection, verification and recollection tracking.
         </p>
       </div>
+
+      {/* ---------------------------------------------------------------------- */}
+      {/* Agent Collections Overview                                              */}
+      {/* ---------------------------------------------------------------------- */}
+
+      {isAdminOrAccountant && agentCollections.length > 0 && (
+        <AgentCollectionsOverview
+          collectorData={agentCollections}
+          accounts={accounts as CollectionsBankAccount[]}
+        />
+      )}
 
       {/* ---------------------------------------------------------------------- */}
       {/* Summary Cards                                                          */}
@@ -175,11 +175,11 @@ export default async function CollectionsPage() {
 
       <Card>
         <CollectionsTable
-          collections={collections as any}
-          accounts={accounts as any}
+          collections={collections as CollectionWithFlags[]}
+          accounts={accounts as CollectionsBankAccount[]}
           isAdminOrAccountant={isAdminOrAccountant}
         />
       </Card>
     </div>
-  )
+  );
 }

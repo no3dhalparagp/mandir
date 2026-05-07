@@ -8,9 +8,9 @@ import { Loader2, ArrowDownCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { createFundTransfer } from "@/app/dashboard/bank/transfers/actions"
 
 const schema = z.object({
@@ -30,7 +30,7 @@ export function WithdrawCashDialog({
 }) {
   const [open, setOpen] = React.useState(false)
   const [pending, startTransition] = React.useTransition()
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormData>({
+  const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { fromAccountId: "", toAccountId: "" }
   })
@@ -46,7 +46,7 @@ export function WithdrawCashDialog({
       if (res.error) toast.error(res.error)
       else { 
         toast.success("Cash withdrawn successfully!")
-        reset()
+        form.reset()
         setOpen(false) 
         window.location.reload()
       }
@@ -63,64 +63,74 @@ export function WithdrawCashDialog({
       } />
       <DialogContent className="sm:max-w-[420px]">
         <DialogHeader><DialogTitle>Withdraw Cash from Bank</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
-          <div className="space-y-2">
-            <Label>From Bank Account *</Label>
-            <Select onValueChange={(v) => setValue("fromAccountId", v as string)}>
-              <SelectTrigger><SelectValue placeholder="Select bank account" /></SelectTrigger>
-              <SelectContent>
-                {bankAccounts.length === 0 ? (
-                  <SelectItem value="__none" disabled>No bank accounts found</SelectItem>
-                ) : (
-                  bankAccounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name} (Bal: ₹{a.currentBalance?.toLocaleString("en-IN") || "0"})
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {errors.fromAccountId && <p className="text-xs text-destructive">{errors.fromAccountId.message}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label>Withdraw To Cash Account *</Label>
-            <Select onValueChange={(v) => setValue("toAccountId", v as string)}>
-              <SelectTrigger><SelectValue placeholder="Select cash account" /></SelectTrigger>
-              <SelectContent>
-                {cashAccounts.length === 0 ? (
-                  <SelectItem value="__none" disabled>No cash accounts found. Please add one first.</SelectItem>
-                ) : (
-                  cashAccounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name} (Bal: ₹{a.currentBalance?.toLocaleString("en-IN") || "0"})
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {errors.toAccountId && <p className="text-xs text-destructive">{errors.toAccountId.message}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label>Amount (₹) *</Label>
-            <Input
-              type="number"
-              step="0.01"
-              {...register("amount", { valueAsNumber: true })}
-            />
-            {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label>Cheque No. / Ref No.</Label>
-            <Input {...register("referenceNo")} placeholder="Optional" />
-          </div>
-          <div className="space-y-2">
-            <Label>Notes</Label>
-            <Input {...register("notes")} placeholder="Optional" />
-          </div>
+        <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-2">
+          <FormField control={form.control} name="fromAccountId" render={({ field }) => (
+            <FormItem>
+              <FormLabel>From Bank Account *</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select bank account" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {bankAccounts.length === 0 ? (
+                    <SelectItem value="__none" disabled>No bank accounts found</SelectItem>
+                  ) : (
+                    bankAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name} (Bal: ₹{a.currentBalance?.toLocaleString("en-IN") || "0"})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="toAccountId" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Withdraw To Cash Account *</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select cash account" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {cashAccounts.length === 0 ? (
+                    <SelectItem value="__none" disabled>No cash accounts found. Please add one first.</SelectItem>
+                  ) : (
+                    cashAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name} (Bal: ₹{a.currentBalance?.toLocaleString("en-IN") || "0"})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="amount" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Amount (₹) *</FormLabel>
+              <FormControl><Input type="number" step="0.01" value={field.value ?? ""} onChange={(e) => field.onChange(e.target.valueAsNumber)} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="referenceNo" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Cheque No. / Ref No.</FormLabel>
+              <FormControl><Input {...field} placeholder="Optional" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="notes" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes</FormLabel>
+              <FormControl><Input {...field} placeholder="Optional" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
           <Button type="submit" className="w-full" disabled={pending || cannotSubmit}>
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Submit Withdrawal
           </Button>
         </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )

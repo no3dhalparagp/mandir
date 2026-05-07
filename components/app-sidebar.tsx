@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   BadgeIndianRupee,
@@ -19,15 +19,17 @@ import {
   UserCheck,
   Landmark,
   ClipboardCheck,
-} from "lucide-react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { signOut } from "next-auth/react"
+  BookOpen,
+  ScrollText,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from "@/components/ui/collapsible";
 import {
   Sidebar,
   SidebarContent,
@@ -43,30 +45,28 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
-import type { LucideIcon } from "lucide-react"
+import type { LucideIcon } from "lucide-react";
 
 type NavItem = {
-  title: string
-  url: string
-  icon: LucideIcon
-  children?: { title: string; url: string; roles?: string[] }[]
-  roles?: string[]
-}
+  title: string;
+  url: string;
+  icon: LucideIcon;
+  children?: { title: string; url: string; roles?: string[] }[];
+  roles?: string[];
+};
 
 type NavGroup = {
-  label: string
-  items: NavItem[]
-  roles?: string[]
-}
+  label: string;
+  items: NavItem[];
+  roles?: string[];
+};
 
 const navGroups: NavGroup[] = [
   {
     label: "Overview",
-    items: [
-      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-    ],
+    items: [{ title: "Dashboard", url: "/dashboard", icon: LayoutDashboard }],
   },
   {
     label: "Finance",
@@ -96,6 +96,11 @@ const navGroups: NavGroup[] = [
         title: "Bank Accounts",
         url: "/dashboard/bank",
         icon: Building2,
+      },
+      {
+        title: "Chart of Accounts",
+        url: "/dashboard/coa",
+        icon: BookOpen,
       },
       {
         title: "Journal / Master Ledger",
@@ -142,7 +147,13 @@ const navGroups: NavGroup[] = [
   },
   {
     label: "Registers",
-    roles: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT", "DATA_ENTRY_OPERATOR", "VIEWER"],
+    roles: [
+      "SUPER_ADMIN",
+      "COMMITTEE_ADMIN",
+      "ACCOUNTANT",
+      "DATA_ENTRY_OPERATOR",
+      "VIEWER",
+    ],
     items: [
       {
         title: "Cheque Register",
@@ -161,26 +172,34 @@ const navGroups: NavGroup[] = [
     roles: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
     items: [
       { title: "User Management", url: "/dashboard/users", icon: ShieldCheck },
+      {
+        title: "Audit Log",
+        url: "/dashboard/audit-log",
+        icon: ScrollText,
+        roles: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
+      },
       { title: "Settings", url: "/dashboard/settings", icon: Settings },
     ],
   },
-]
+];
 
 export function AppSidebar({ role = "VIEWER" }: { role?: string }) {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   const filteredNavGroups = navGroups
-    .filter(group => !group.roles || group.roles.includes(role))
-    .map(group => ({
+    .filter((group) => !group.roles || group.roles.includes(role))
+    .map((group) => ({
       ...group,
       items: group.items
-        .filter(item => !item.roles || item.roles.includes(role))
-        .map(item => ({
+        .filter((item) => !item.roles || item.roles.includes(role))
+        .map((item) => ({
           ...item,
-          children: item.children?.filter(child => !child.roles || child.roles.includes(role))
-        }))
+          children: item.children?.filter(
+            (child) => !child.roles || child.roles.includes(role),
+          ),
+        })),
     }))
-    .filter(group => group.items.length > 0)
+    .filter((group) => group.items.length > 0);
 
   return (
     <Sidebar>
@@ -191,7 +210,9 @@ export function AppSidebar({ role = "VIEWER" }: { role?: string }) {
           </div>
           <div>
             <p className="text-sm font-bold leading-none">Mandir System</p>
-            <p className="text-xs text-muted-foreground leading-none mt-0.5">Committee Accounts</p>
+            <p className="text-xs text-muted-foreground leading-none mt-0.5">
+              Committee Accounts
+            </p>
           </div>
         </div>
       </SidebarHeader>
@@ -248,7 +269,7 @@ export function AppSidebar({ role = "VIEWER" }: { role?: string }) {
                         <span>{item.title}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                  )
+                  ),
                 )}
               </SidebarMenu>
             </SidebarGroupContent>
@@ -271,5 +292,5 @@ export function AppSidebar({ role = "VIEWER" }: { role?: string }) {
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }

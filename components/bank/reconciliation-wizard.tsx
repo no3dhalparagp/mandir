@@ -11,7 +11,14 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Select,
   SelectContent,
@@ -76,13 +83,7 @@ export function ReconciliationWizard({
   const [matchedIds, setMatchedIds] = React.useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<SetupData>({
+  const form = useForm<SetupData>({
     resolver: zodResolver(setupSchema),
     defaultValues: {
       statementFromDate: new Date(
@@ -100,8 +101,8 @@ export function ReconciliationWizard({
     },
   });
 
-  const fromDate = watch("statementFromDate");
-  const toDate = watch("statementToDate");
+  const fromDate = form.watch("statementFromDate");
+  const toDate = form.watch("statementToDate");
 
   async function onSetupComplete(data: SetupData) {
     setSetupData(data);
@@ -312,123 +313,170 @@ export function ReconciliationWizard({
       <CardContent>
         <form
           id="setup-form"
-          onSubmit={handleSubmit(onSetupComplete)}
+          onSubmit={form.handleSubmit(onSetupComplete)}
           className="grid md:grid-cols-2 gap-6"
         >
-          <div className="space-y-2 col-span-2 md:col-span-1">
-            <Label>Bank Account *</Label>
-            <Select onValueChange={(v) => setValue("accountId", v as string)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.accountId && (
-              <p className="text-xs text-destructive">
-                {errors.accountId.message}
-              </p>
+          <Form {...form}>
+          <FormField
+            control={form.control}
+            name="accountId"
+            render={({ field }) => (
+              <FormItem className="space-y-2 col-span-2 md:col-span-1">
+                <FormLabel>Bank Account *</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
 
           <div className="hidden md:block" />
 
-          <div className="space-y-2">
-            <Label>Statement Start Date *</Label>
-            <Popover>
-              <PopoverTrigger
-                render={
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !fromDate && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {fromDate ? (
-                      format(fromDate, "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                }
-              />
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={fromDate}
-                  onSelect={(d) => d && setValue("statementFromDate", d)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Statement End Date *</Label>
-            <Popover>
-              <PopoverTrigger
-                render={
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !toDate && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {toDate ? format(toDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                }
-              />
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={toDate}
-                  onSelect={(d) => d && setValue("statementToDate", d)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Opening Balance on Statement (₹) *</Label>
-            <Input
-              type="number"
-              step="0.01"
-              {...register("openingBalanceBank", { valueAsNumber: true })}
-            />
-            {errors.openingBalanceBank && (
-              <p className="text-xs text-destructive">{errors.openingBalanceBank.message}</p>
+          <FormField
+            control={form.control}
+            name="statementFromDate"
+            render={({ field }) => (
+              <FormItem className="space-y-2">
+                <FormLabel>Statement Start Date *</FormLabel>
+                <Popover>
+                  <PopoverTrigger
+                    render={
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !fromDate && "text-muted-foreground",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {fromDate ? (
+                            format(fromDate, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </FormControl>
+                    }
+                  />
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={fromDate}
+                      onSelect={(d) => d && field.onChange(d)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
 
-          <div className="space-y-2">
-            <Label>Closing Balance on Statement (₹) *</Label>
-            <Input
-              type="number"
-              step="0.01"
-              {...register("closingBalanceBank", { valueAsNumber: true })}
-            />
-            {errors.closingBalanceBank && (
-              <p className="text-xs text-destructive">{errors.closingBalanceBank.message}</p>
+          <FormField
+            control={form.control}
+            name="statementToDate"
+            render={({ field }) => (
+              <FormItem className="space-y-2">
+                <FormLabel>Statement End Date *</FormLabel>
+                <Popover>
+                  <PopoverTrigger
+                    render={
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !toDate && "text-muted-foreground",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {toDate ? format(toDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </FormControl>
+                    }
+                  />
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={toDate}
+                      onSelect={(d) => d && field.onChange(d)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
 
-          <div className="space-y-2 col-span-2">
-            <Label>Notes (Optional)</Label>
-            <Input
-              {...register("notes")}
-              placeholder="e.g. Month End statement"
-            />
-          </div>
+          <FormField
+            control={form.control}
+            name="openingBalanceBank"
+            render={({ field }) => (
+              <FormItem className="space-y-2">
+                <FormLabel>Opening Balance on Statement (₹) *</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={field.value ?? ""}
+                    onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="closingBalanceBank"
+            render={({ field }) => (
+              <FormItem className="space-y-2">
+                <FormLabel>Closing Balance on Statement (₹) *</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={field.value ?? ""}
+                    onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem className="space-y-2 col-span-2">
+                <FormLabel>Notes (Optional)</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder="e.g. Month End statement"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          </Form>
         </form>
       </CardContent>
       <CardFooter className="justify-end">

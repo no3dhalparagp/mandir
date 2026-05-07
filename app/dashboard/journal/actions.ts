@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requirePermission } from "@/lib/authorization"
+import { assertDateNotClosed } from "@/lib/book-closure"
 
 const journalSchema = z.object({
   debitAccountId: z.string().min(1, "Select debit account"),
@@ -18,6 +19,7 @@ export async function createJournalEntry(data: z.infer<typeof journalSchema>) {
   try {
     await requirePermission("journal", "create")
     const validated = journalSchema.parse(data)
+    await assertDateNotClosed(validated.date, "Journal entry")
     
     if (validated.debitAccountId === validated.creditAccountId) {
       return { error: "Debit and credit accounts must be different." }

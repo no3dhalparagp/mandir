@@ -2,8 +2,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { getBookClosures } from "@/app/dashboard/settings/actions"
+import { BookClosureCard } from "@/components/settings/book-closure-card"
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const closures = await getBookClosures()
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -79,6 +83,10 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Separator />
+
+      <BookClosureCard closures={closures} />
     </div>
   )
 }

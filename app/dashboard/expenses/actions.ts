@@ -6,6 +6,7 @@ import { z } from "zod"
 import { ChequeNature, ExpenseCategory, PaymentMode } from "@prisma/client"
 import { requirePermission, requireAuth } from "@/lib/authorization"
 import { createAssetRecord } from "@/lib/accounting"
+import { assertDateNotClosed } from "@/lib/book-closure"
 
 async function recalculateBalancesForAccount(accountId: string) {
   const entries = await prisma.ledgerEntry.findMany({
@@ -26,7 +27,7 @@ async function recalculateBalancesForAccount(accountId: string) {
 const expenseSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters."),
   category: z.nativeEnum(ExpenseCategory),
-  amount: z.coerce.number().min(1, "Amount must be greater than 0"),
+  amount: z.coerce.number().int().min(1, "Amount must be greater than 0"),
   vendorName: z.string().optional(),
   vendorMobile: z.string().optional(),
   paymentMode: z.nativeEnum(PaymentMode),
@@ -49,6 +50,7 @@ export async function createExpense(data: z.infer<typeof expenseSchema>) {
     await requirePermission("expenses", "create")
     const validatedData = expenseSchema.parse(data)
     const user = await requireAuth()
+    await assertDateNotClosed(new Date(), "Expense entry")
 
     const isAutoApproved =
       user.role === "SUPER_ADMIN" || user.role === "COMMITTEE_ADMIN"
@@ -167,6 +169,7 @@ export async function approveExpense(id: string) {
   try {
     await requirePermission("expenses", "approve")
     const user = await requireAuth()
+    await assertDateNotClosed(new Date(), "Expense approval posting")
     const expense = await prisma.expense.update({
       where: { id },
       data: {

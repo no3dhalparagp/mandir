@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -54,7 +54,7 @@ const expenseSchema = z.object({
   notes: z.string().optional(),
 })
 
-type ExpenseFormData = z.infer<typeof expenseSchema>
+type ExpenseFormData = z.input<typeof expenseSchema>
 
 interface ExpenseFormProps {
   onSuccess: () => void
@@ -64,17 +64,18 @@ interface ExpenseFormProps {
 
 export function ExpenseForm({ onSuccess, accounts, chequeLeaves }: ExpenseFormProps) {
   const [isPending, startTransition] = React.useTransition()
-  const [paymentMode, setPaymentMode] = React.useState("CASH")
+  const [paymentMode, setPaymentMode] = React.useState<ExpenseFormData["paymentMode"]>("CASH")
   const [isAssetPurchase, setIsAssetPurchase] = React.useState(false)
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<ExpenseFormData>({
+  const form = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: { category: "MISC", paymentMode: "CASH", isAssetPurchase: false },
   })
 
   function onSubmit(data: ExpenseFormData) {
     startTransition(async () => {
-      const result = await createExpense(data)
+      const parsed = expenseSchema.parse(data)
+      const result = await createExpense(parsed)
       if (result.error) toast.error(result.error)
       else { toast.success("Expense recorded!"); onSuccess() }
     })
@@ -82,167 +83,248 @@ export function ExpenseForm({ onSuccess, accounts, chequeLeaves }: ExpenseFormPr
 
   const showCheque = paymentMode === "CHEQUE" || paymentMode === "DD"
   const showTxn = ["UPI", "NEFT", "RTGS", "IMPS"].includes(paymentMode)
+  const selectedAccountId = form.watch("accountId")
+
+  const nextChequeByAccount = React.useMemo(() => {
+    const sorted = [...chequeLeaves].sort((a, b) =>
+      a.chequeNumber.localeCompare(b.chequeNumber, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      })
+    )
+
+    const map = new Map<string, (typeof chequeLeaves)[number]>()
+    for (const leaf of sorted) {
+      if (!map.has(leaf.accountId)) {
+        map.set(leaf.accountId, leaf)
+      }
+    }
+    return map
+  }, [chequeLeaves])
+
+  const nextCheques = React.useMemo(
+    () => Array.from(nextChequeByAccount.values()),
+    [nextChequeByAccount]
+  )
+  const accountNameById = React.useMemo(
+    () => new Map(accounts.map((a) => [a.id, a.name])),
+    [accounts]
+  )
+
+  React.useEffect(() => {
+    if (!showCheque) {
+      form.setValue("chequeLeafId", "")
+      return
+    }
+
+    if (selectedAccountId) {
+      const nextLeaf = nextChequeByAccount.get(selectedAccountId)
+      form.setValue("chequeLeafId", nextLeaf?.id ?? "")
+      form.setValue("chequeNumber", nextLeaf?.chequeNumber ?? "")
+      return
+    }
+
+    form.setValue("chequeLeafId", "")
+  }, [showCheque, selectedAccountId, nextChequeByAccount, form])
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-      <div className="space-y-2">
-        <Label>Title *</Label>
-        <Input {...register("title")} />
-        {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
+    <Form {...form}>
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+      <FormField control={form.control} name="title" render={({ field }) => (
+        <FormItem>
+          <FormLabel>Title *</FormLabel>
+          <FormControl><Input {...field} /></FormControl>
+          <FormMessage />
+        </FormItem>
+      )} />
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField control={form.control} name="category" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Category</FormLabel>
+            <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+              <SelectContent>
+                <SelectItem value="PUJA_MATERIALS">Puja Materials</SelectItem>
+                <SelectItem value="ELECTRICITY">Electricity</SelectItem>
+                <SelectItem value="SALARY">Salary</SelectItem>
+                <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                <SelectItem value="DECORATION">Decoration</SelectItem>
+                <SelectItem value="FOOD_PRASAD">Food / Prasad</SelectItem>
+                <SelectItem value="CONSTRUCTION">Construction</SelectItem>
+                <SelectItem value="PRINTING">Printing</SelectItem>
+                <SelectItem value="TRANSPORT">Transport</SelectItem>
+                <SelectItem value="MISC">Miscellaneous</SelectItem>
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={form.control} name="amount" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Amount (₹) *</FormLabel>
+            <FormControl><Input type="number" step="0.01" value={field.value ?? ""} onChange={(e) => field.onChange(e.target.valueAsNumber)} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Category</Label>
-          <Select
-            onValueChange={(v) => setValue("category", v as ExpenseFormData["category"])}
-            defaultValue="MISC"
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="PUJA_MATERIALS">Puja Materials</SelectItem>
-              <SelectItem value="ELECTRICITY">Electricity</SelectItem>
-              <SelectItem value="SALARY">Salary</SelectItem>
-              <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-              <SelectItem value="DECORATION">Decoration</SelectItem>
-              <SelectItem value="FOOD_PRASAD">Food / Prasad</SelectItem>
-              <SelectItem value="CONSTRUCTION">Construction</SelectItem>
-              <SelectItem value="PRINTING">Printing</SelectItem>
-              <SelectItem value="TRANSPORT">Transport</SelectItem>
-              <SelectItem value="MISC">Miscellaneous</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Amount (₹) *</Label>
-          <Input
-            type="number"
-            step="0.01"
-            {...register("amount", { valueAsNumber: true })}
-          />
-          {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Vendor Name</Label>
-          <Input {...register("vendorName")} />
-        </div>
-        <div className="space-y-2">
-          <Label>Bill Number</Label>
-          <Input {...register("billNumber")} />
-        </div>
+        <FormField control={form.control} name="vendorName" render={({ field }) => (
+          <FormItem><FormLabel>Vendor Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="billNumber" render={({ field }) => (
+          <FormItem><FormLabel>Bill Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
       </div>
 
       <Separator />
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Payment Mode</Label>
-          <Select
-            onValueChange={(v) => {
-              // `v` can be `string | null`; fallback to "CASH"
-              const mode = v ?? "CASH"
-              setValue("paymentMode", mode as ExpenseFormData["paymentMode"])
-              setPaymentMode(mode)
-            }}
-            defaultValue="CASH"
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CASH">Cash</SelectItem>
-              <SelectItem value="UPI">UPI</SelectItem>
-              <SelectItem value="CHEQUE">Cheque</SelectItem>
-              <SelectItem value="NEFT">NEFT</SelectItem>
-              <SelectItem value="RTGS">RTGS</SelectItem>
-              <SelectItem value="IMPS">IMPS</SelectItem>
-              <SelectItem value="DD">Demand Draft</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Paid from Account</Label>
-          <Select onValueChange={(v) => setValue("accountId", (v as string) === "__none" ? "" : v as string)}>
-            <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none">— Not specified —</SelectItem>
-              {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+        <FormField control={form.control} name="paymentMode" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Payment Mode</FormLabel>
+            <Select onValueChange={(v) => { field.onChange(v); setPaymentMode(v as ExpenseFormData["paymentMode"]) }} defaultValue={field.value}>
+              <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+              <SelectContent>
+                <SelectItem value="CASH">Cash</SelectItem>
+                <SelectItem value="UPI">UPI</SelectItem>
+                <SelectItem value="CHEQUE">Cheque</SelectItem>
+                <SelectItem value="NEFT">NEFT</SelectItem>
+                <SelectItem value="RTGS">RTGS</SelectItem>
+                <SelectItem value="IMPS">IMPS</SelectItem>
+                <SelectItem value="DD">Demand Draft</SelectItem>
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={form.control} name="accountId" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Paid from Account</FormLabel>
+            <Select onValueChange={(v) => field.onChange(v === "__none" ? "" : v)} value={field.value || "__none"}>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account">
+                    {field.value ? accountNameById.get(field.value) ?? "Select account" : "Select account"}
+                  </SelectValue>
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="__none">— Not specified —</SelectItem>
+                {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
       </div>
 
       {showCheque && (
         <div className="grid grid-cols-1 gap-4">
-          <div className="space-y-2">
-            <Label>Use from Cheque Book (optional)</Label>
-            <Select onValueChange={(v) => setValue("chequeLeafId", v === "__manual" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Pick unused cheque leaf" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__manual">Manual entry</SelectItem>
-                {chequeLeaves.map((leaf) => (
-                  <SelectItem key={leaf.id} value={leaf.id}>
-                    {leaf.chequeNumber} - {leaf.account.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <FormField control={form.control} name="chequeLeafId" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Use Current Cheque</FormLabel>
+              <Select
+                value={field.value || "__manual"}
+                onValueChange={(v) => {
+                  const selectedLeafId = v === "__manual" ? "" : (v as string)
+                  field.onChange(selectedLeafId)
+
+                  const leaf = chequeLeaves.find((l) => l.id === selectedLeafId)
+                  form.setValue("chequeNumber", leaf?.chequeNumber ?? "")
+                }}
+                disabled={!!selectedAccountId && !nextChequeByAccount.has(selectedAccountId)}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pick current cheque">
+                      {field.value
+                        ? (() => {
+                            const selectedLeaf = chequeLeaves.find((l) => l.id === field.value)
+                            return selectedLeaf
+                              ? `${selectedLeaf.chequeNumber} - ${selectedLeaf.account.name}`
+                              : "Pick current cheque"
+                          })()
+                        : "Pick current cheque"}
+                    </SelectValue>
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="__manual">Manual entry</SelectItem>
+                  {selectedAccountId
+                    ? (() => {
+                        const nextLeaf = nextChequeByAccount.get(selectedAccountId)
+                        return nextLeaf ? (
+                          <SelectItem key={nextLeaf.id} value={nextLeaf.id}>
+                            {nextLeaf.chequeNumber} - {nextLeaf.account.name}
+                          </SelectItem>
+                        ) : (
+                          <SelectItem value="__none" disabled>
+                            No unused cheque available for selected account
+                          </SelectItem>
+                        )
+                      })()
+                    : nextCheques.map((leaf) => (
+                        <SelectItem key={leaf.id} value={leaf.id}>
+                          {leaf.chequeNumber} - {leaf.account.name}
+                        </SelectItem>
+                      ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
           <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Cheque No.</Label>
-            <Input {...register("chequeNumber")} />
-          </div>
-          <div className="space-y-2">
-            <Label>Cheque Date</Label>
-            <Input type="date" {...register("chequeDate")} />
-          </div>
+          <FormField control={form.control} name="chequeNumber" render={({ field }) => (
+            <FormItem><FormLabel>Cheque No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+          )} />
+          <FormField control={form.control} name="chequeDate" render={({ field }) => (
+            <FormItem><FormLabel>Cheque Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+          )} />
           </div>
         </div>
       )}
       {showTxn && (
-        <div className="space-y-2">
-          <Label>Transaction / Reference ID</Label>
-          <Input {...register("transactionId")} placeholder="UTR / Ref Number" />
-        </div>
+        <FormField control={form.control} name="transactionId" render={({ field }) => (
+          <FormItem><FormLabel>Transaction / Reference ID</FormLabel><FormControl><Input {...field} placeholder="UTR / Ref Number" /></FormControl><FormMessage /></FormItem>
+        )} />
       )}
 
-      <div className="space-y-2">
-        <Label>Notes</Label>
-        <Input {...register("notes")} />
-      </div>
+      <FormField control={form.control} name="notes" render={({ field }) => (
+        <FormItem><FormLabel>Notes</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+      )} />
 
       <Separator />
-      <div className="flex items-center gap-2">
-        <Checkbox
-          checked={isAssetPurchase}
-          onCheckedChange={(checked) => {
-            const value = checked === true
-            setIsAssetPurchase(value)
-            setValue("isAssetPurchase", value)
-          }}
-        />
-        <Label>This expense creates a fixed asset entry</Label>
-      </div>
+      <FormField control={form.control} name="isAssetPurchase" render={({ field }) => (
+        <FormItem className="flex flex-row items-center gap-2 space-y-0">
+          <FormControl>
+            <Checkbox
+              checked={isAssetPurchase}
+              onCheckedChange={(checked) => {
+                const value = checked === true
+                setIsAssetPurchase(value)
+                field.onChange(value)
+              }}
+            />
+          </FormControl>
+          <FormLabel>This expense creates a fixed asset entry</FormLabel>
+        </FormItem>
+      )} />
       {isAssetPurchase && (
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Asset Name</Label>
-            <Input {...register("assetName")} placeholder="Defaults to expense title" />
-          </div>
-          <div className="space-y-2">
-            <Label>Asset Category</Label>
-            <Input {...register("assetCategory")} placeholder="Defaults to expense category" />
-          </div>
-          <div className="space-y-2">
-            <Label>Useful Life (Years)</Label>
-            <Input type="number" {...register("assetUsefulLifeYears", { valueAsNumber: true })} />
-          </div>
-          <div className="space-y-2">
-            <Label>Asset Location</Label>
-            <Input {...register("assetLocation")} />
-          </div>
+          <FormField control={form.control} name="assetName" render={({ field }) => (
+            <FormItem><FormLabel>Asset Name</FormLabel><FormControl><Input {...field} placeholder="Defaults to expense title" /></FormControl><FormMessage /></FormItem>
+          )} />
+          <FormField control={form.control} name="assetCategory" render={({ field }) => (
+            <FormItem><FormLabel>Asset Category</FormLabel><FormControl><Input {...field} placeholder="Defaults to expense category" /></FormControl><FormMessage /></FormItem>
+          )} />
+          <FormField control={form.control} name="assetUsefulLifeYears" render={({ field }) => (
+            <FormItem><FormLabel>Useful Life (Years)</FormLabel><FormControl><Input type="number" value={typeof field.value === "number" ? field.value : ""} onChange={(e) => field.onChange(e.target.value === "" ? undefined : e.target.valueAsNumber)} /></FormControl><FormMessage /></FormItem>
+          )} />
+          <FormField control={form.control} name="assetLocation" render={({ field }) => (
+            <FormItem><FormLabel>Asset Location</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+          )} />
         </div>
       )}
 
@@ -251,5 +333,6 @@ export function ExpenseForm({ onSuccess, accounts, chequeLeaves }: ExpenseFormPr
         Submit Expense
       </Button>
     </form>
+    </Form>
   )
 }

@@ -9,6 +9,10 @@ import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { requirePermission } from "@/lib/authorization"
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
 const memberSchema = z.object({
   name: z.string().min(2, "Name is required"),
   designation: z.nativeEnum(MemberDesignation),
@@ -83,9 +87,9 @@ export async function createMember(data: z.infer<typeof memberSchema>) {
 
     revalidatePath("/dashboard/members")
     return { success: true, data: member }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(error)
-    return { error: error.message || "Failed to create member." }
+    return { error: getErrorMessage(error, "Failed to create member.") }
   }
 }
 

@@ -67,4 +67,12 @@ export const PERMISSIONS = {
     read: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
     edit: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
   },
+  coa: {
+    create: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
+    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
+    edit: ["SUPER_ADMIN", "COMMITTEE_ADMIN", "ACCOUNTANT"],
+  },
+  audit: {
+    read: ["SUPER_ADMIN", "COMMITTEE_ADMIN"],
+  },
 } as const

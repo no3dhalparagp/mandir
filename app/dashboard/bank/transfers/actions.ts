@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { requirePermission } from "@/lib/authorization"
+import { assertDateNotClosed } from "@/lib/book-closure"
 
 /* -------------------------------------------------------
    SCHEMA
@@ -72,6 +73,7 @@ export async function createFundTransfer(
 ) {
   try {
     await requirePermission("bank", "create")
+    await assertDateNotClosed(new Date(), "Fund transfer")
 
     const validated =
       transferSchema.parse(data)

@@ -7,8 +7,8 @@ import { z } from "zod";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -23,6 +23,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { createMember } from "@/app/dashboard/members/actions";
 
 const schema = z
@@ -39,13 +47,17 @@ const schema = z
       "VOLUNTEER",
     ]),
     mobile: z.string().optional(),
-    email: z.string().optional(),
+    email: z.string().email("Enter a valid email").optional().or(z.literal("")),
     address: z.string().optional(),
     canCollect: z.boolean().default(false),
+    status: z.enum(["ACTIVE", "RETIRED"]).default("ACTIVE"),
     notes: z.string().optional(),
 
     createLogin: z.boolean().default(false),
-    password: z.string().optional(),
+    password: z
+      .string()
+      .min(6, "Password must be at least 6 characters")
+      .optional(),
     role: z
       .enum([
         "VIEWER",
@@ -70,20 +82,13 @@ const schema = z
     },
   );
 
-type FormData = z.infer<typeof schema>;
+type FormData = z.input<typeof schema>;
 
 export function AddMemberDialog() {
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema) as any,
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
     defaultValues: {
       designation: "MEMBER",
       canCollect: false,
@@ -91,15 +96,16 @@ export function AddMemberDialog() {
     },
   });
 
-  const createLogin = watch("createLogin");
+  const createLogin = form.watch("createLogin");
 
   function onSubmit(data: FormData) {
     startTransition(async () => {
-      const res = await createMember(data as any);
+      const validated = schema.parse(data);
+      const res = await createMember(validated);
       if (res.error) toast.error(res.error);
       else {
         toast.success("Member added!");
-        reset();
+        form.reset();
         setOpen(false);
       }
     });
@@ -114,146 +120,203 @@ export function AddMemberDialog() {
         <DialogHeader>
           <DialogTitle>Add Committee Member</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
-          {errors.createLogin && (
-            <p className="text-xs text-destructive">
-              {errors.createLogin.message}
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 space-y-2">
-              <Label>Full Name *</Label>
-              <Input {...register("name")} />
-              {errors.name && (
-                <p className="text-xs text-destructive">
-                  {errors.name.message}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Designation</Label>
-              <Select
-                onValueChange={(v) =>
-                  setValue(
-                    "designation",
-                    v as
-                      | "PRESIDENT"
-                      | "VICE_PRESIDENT"
-                      | "SECRETARY"
-                      | "JOINT_SECRETARY"
-                      | "TREASURER"
-                      | "JOINT_TREASURER"
-                      | "MEMBER"
-                      | "VOLUNTEER",
-                  )
-                }
-                defaultValue="MEMBER"
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PRESIDENT">President</SelectItem>
-                  <SelectItem value="VICE_PRESIDENT">Vice President</SelectItem>
-                  <SelectItem value="SECRETARY">Secretary</SelectItem>
-                  <SelectItem value="JOINT_SECRETARY">Jt. Secretary</SelectItem>
-                  <SelectItem value="TREASURER">Treasurer</SelectItem>
-                  <SelectItem value="JOINT_TREASURER">Jt. Treasurer</SelectItem>
-                  <SelectItem value="MEMBER">Member</SelectItem>
-                  <SelectItem value="VOLUNTEER">Volunteer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Mobile</Label>
-              <Input {...register("mobile")} />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                {...register("email")}
-                required={createLogin}
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 mt-2"
+          >
+            <FormField
+              control={form.control}
+              name="createLogin"
+              render={() => <FormMessage />}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Full Name *</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Address</Label>
-              <Input {...register("address")} />
-            </div>
-            <div className="col-span-2 flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="canCollect"
-                {...register("canCollect")}
-                className="h-4 w-4"
-              />
-              <Label htmlFor="canCollect" className="text-sm font-normal">
-                Authorize this member to collect donations
-              </Label>
-            </div>
-
-            <div className="col-span-2 pt-4 border-t">
-              <div className="flex items-center gap-2 mb-4">
-                <input
-                  type="checkbox"
-                  id="createLogin"
-                  {...register("createLogin")}
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="createLogin" className="text-sm font-medium">
-                  Create Login Account for this Member
-                </Label>
-              </div>
-
-              {createLogin && (
-                <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
-                  <div className="col-span-2 md:col-span-1 space-y-2">
-                    <Label>Password *</Label>
-                    <Input
-                      type="password"
-                      {...register("password")}
-                      required={createLogin}
-                    />
-                  </div>
-                  <div className="col-span-2 md:col-span-1 space-y-2">
-                    <Label>System Role *</Label>
+              <FormField
+                control={form.control}
+                name="designation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Designation</FormLabel>
                     <Select
-                      onValueChange={(v) =>
-                        setValue(
-                          "role",
-                          v as
-                            | "VIEWER"
-                            | "DATA_ENTRY_OPERATOR"
-                            | "ACCOUNTANT"
-                            | "COMMITTEE_ADMIN"
-                            | "SUPER_ADMIN",
-                        )
-                      }
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
-                        <SelectItem value="VIEWER">Viewer</SelectItem>
-                        <SelectItem value="DATA_ENTRY_OPERATOR">
-                          Data Entry Operator
+                        <SelectItem value="PRESIDENT">President</SelectItem>
+                        <SelectItem value="VICE_PRESIDENT">
+                          Vice President
                         </SelectItem>
-                        <SelectItem value="ACCOUNTANT">Accountant</SelectItem>
-                        <SelectItem value="COMMITTEE_ADMIN">
-                          Committee Admin
+                        <SelectItem value="SECRETARY">Secretary</SelectItem>
+                        <SelectItem value="JOINT_SECRETARY">
+                          Jt. Secretary
                         </SelectItem>
+                        <SelectItem value="TREASURER">Treasurer</SelectItem>
+                        <SelectItem value="JOINT_TREASURER">
+                          Jt. Treasurer
+                        </SelectItem>
+                        <SelectItem value="MEMBER">Member</SelectItem>
+                        <SelectItem value="VOLUNTEER">Volunteer</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="mobile"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mobile</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" {...field} required={createLogin} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="canCollect"
+                render={({ field }) => (
+                  <FormItem className="col-span-2 flex flex-row items-center gap-2 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormLabel className="text-sm font-normal">
+                      Authorize this member to collect donations
+                    </FormLabel>
+                  </FormItem>
+                )}
+              />
+
+              <div className="col-span-2 pt-4 border-t">
+                <FormField
+                  control={form.control}
+                  name="createLogin"
+                  render={({ field }) => (
+                    <FormItem className="mb-4 flex flex-row items-center gap-2 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm font-medium">
+                        Create Login Account for this Member
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
+
+                {createLogin && (
+                  <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2 md:col-span-1">
+                          <FormLabel>Password *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              {...field}
+                              required={createLogin}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2 md:col-span-1">
+                          <FormLabel>System Role *</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select role" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="VIEWER">Viewer</SelectItem>
+                              <SelectItem value="DATA_ENTRY_OPERATOR">
+                                Data Entry Operator
+                              </SelectItem>
+                              <SelectItem value="ACCOUNTANT">
+                                Accountant
+                              </SelectItem>
+                              <SelectItem value="COMMITTEE_ADMIN">
+                                Committee Admin
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save
-            Member
-          </Button>
-        </form>
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{" "}
+              Save Member
+            </Button>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

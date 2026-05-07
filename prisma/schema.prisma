@@ -147,6 +147,11 @@ enum ChequeLeafStatus {
   CANCELLED
 }
 
+enum BookClosureType {
+  MONTH
+  YEAR
+}
+
 // ─── Core User ────────────────────────────────────────────────────────────────
 
 model User {
@@ -164,6 +169,8 @@ model User {
   reconciliations        BankReconciliation[]    @relation("ReconciledBy")
   member                 Member?
   accountingTransactions AccountingTransaction[]
+  bookClosures           BookClosure[]           @relation("BookClosedBy")
+  auditLogs              AuditLog[]
 }
 
 // ─── Chart of Accounts ─────────────────────────────────────────────────────────
@@ -598,7 +605,24 @@ model AuditLog {
   entity    String
   entityId  String?
   userId    String?  @db.ObjectId
+  user      User?    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   details   String?
   ipAddress String?
   createdAt DateTime @default(now())
+}
+
+model BookClosure {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  closureType BookClosureType
+  label       String
+  periodStart DateTime
+  periodEnd   DateTime
+  notes       String?
+  closedAt    DateTime        @default(now())
+
+  closedById String? @db.ObjectId
+  closedBy   User?   @relation("BookClosedBy", fields: [closedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([closureType, periodStart, periodEnd])
+  @@index([periodStart, periodEnd])
 }

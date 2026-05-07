@@ -1,15 +1,11 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import { format } from "date-fns"
+import { useMemo, useState } from "react";
+import { format } from "date-fns";
 
-import { BulkSendToCashToolbar } from "./bulk-send-to-cash-toolbar"
-import { Badge } from "@/components/ui/badge"
-import {
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { BulkSendToCashToolbar } from "./bulk-send-to-cash-toolbar";
+import { Badge } from "@/components/ui/badge";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -17,41 +13,41 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Checkbox } from "@/components/ui/checkbox"
-import { VerifyCollectionButton } from "@/components/collections/verify-collection-button"
-import { DepositCollectionButton } from "@/components/collections/deposit-collection-button"
+} from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { VerifyCollectionButton } from "@/components/collections/verify-collection-button";
+import { DepositCollectionButton } from "@/components/collections/deposit-collection-button";
 
-type CollectionWithFlags = {
-  id: string
-  collectedDate: Date
-  collectedAmount: number
-  verifiedAmount: number | null
-  verifiedById: string | null
-  status: string
-  isInCashAccount?: boolean
-  canSendToCash?: boolean
+export type CollectionWithFlags = {
+  id: string;
+  collectedDate: Date;
+  collectedAmount: number;
+  verifiedAmount: number | null;
+  verifiedById: string | null;
+  status: string;
+  isInCashAccount?: boolean;
+  canSendToCash?: boolean;
   member: {
-    name: string
-    memberId: string
-  }
+    name: string;
+    memberId: string;
+  };
   donation: {
-    donorName: string
-    receiptNo: string
-  }
+    donorName: string;
+    receiptNo: string;
+  };
   depositedToAccount: {
-    name: string
-  } | null
+    name: string;
+  } | null;
   verifiedBy: {
-    name: string
-  } | null
-}
+    name: string;
+  } | null;
+};
 
-type BankAccount = {
-  id: string
-  name: string
-  accountType: string
-}
+export type CollectionsBankAccount = {
+  id: string;
+  name: string;
+  accountType: string;
+};
 
 const statusColors: Record<
   string,
@@ -61,64 +57,62 @@ const statusColors: Record<
   DEPOSITED: "outline",
   VERIFIED: "default",
   DISCREPANT: "destructive",
-}
+};
 
 type Props = {
-  collections: CollectionWithFlags[]
-  accounts: BankAccount[]
-  isAdminOrAccountant: boolean
-}
+  collections: CollectionWithFlags[];
+  accounts: CollectionsBankAccount[];
+  isAdminOrAccountant: boolean;
+};
 
 export function CollectionsTable({
   collections,
   accounts,
   isAdminOrAccountant,
 }: Props) {
-  const [selected, setSelected] = useState<Record<string, boolean>>({})
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   const cashAccounts = useMemo(
     () => accounts.filter((a) => a.accountType === "CASH_IN_HAND"),
-    [accounts]
-  )
+    [accounts],
+  );
 
   const eligibleCollections = useMemo(
     () =>
       collections.filter(
         (c) =>
-          c.status === "VERIFIED" &&
+          (c.status === "VERIFIED" || c.status === "DISCREPANT") &&
           !c.isInCashAccount &&
-          !!c.canSendToCash
+          !!c.canSendToCash,
       ),
-    [collections]
-  )
+    [collections],
+  );
 
   const selectedIds = useMemo(
     () =>
       Object.entries(selected)
-        .filter(([_, v]) => v)
+        .filter(([, v]) => v)
         .map(([id]) => id)
-        .filter((id) =>
-          eligibleCollections.some((c) => c.id === id)
-        ),
-    [selected, eligibleCollections]
-  )
+        .filter((id) => eligibleCollections.some((c) => c.id === id)),
+    [selected, eligibleCollections],
+  );
 
   const toggleRow = (id: string, checked: boolean) => {
-    setSelected((prev) => ({ ...prev, [id]: checked }))
-  }
+    setSelected((prev) => ({ ...prev, [id]: checked }));
+  };
 
   const toggleAll = (checked: boolean) => {
     if (!checked) {
-      setSelected({})
-      return
+      setSelected({});
+      return;
     }
 
-    const next: Record<string, boolean> = {}
+    const next: Record<string, boolean> = {};
     for (const c of eligibleCollections) {
-      next[c.id] = true
+      next[c.id] = true;
     }
-    setSelected(next)
-  }
+    setSelected(next);
+  };
 
   return (
     <>
@@ -145,12 +139,9 @@ export function CollectionsTable({
                   <Checkbox
                     checked={
                       eligibleCollections.length > 0 &&
-                      selectedIds.length ===
-                        eligibleCollections.length
+                      selectedIds.length === eligibleCollections.length
                     }
-                    onCheckedChange={(val) =>
-                      toggleAll(val === true)
-                    }
+                    onCheckedChange={(val) => toggleAll(val === true)}
                     aria-label="Select all verified not-in-cash collections"
                   />
                 )}
@@ -180,19 +171,18 @@ export function CollectionsTable({
               </TableRow>
             ) : (
               collections.map((c) => {
-                const verifiedAmount =
-                  c.verifiedAmount ?? c.collectedAmount
+                const verifiedAmount = c.verifiedAmount ?? c.collectedAmount;
 
                 const shortage =
                   c.status === "DISCREPANT"
                     ? c.collectedAmount - verifiedAmount
-                    : 0
+                    : 0;
 
                 const selectable =
                   isAdminOrAccountant &&
-                  c.status === "VERIFIED" &&
+                  (c.status === "VERIFIED" || c.status === "DISCREPANT") &&
                   !c.isInCashAccount &&
-                  !!c.canSendToCash
+                  !!c.canSendToCash;
 
                 return (
                   <TableRow key={c.id}>
@@ -214,9 +204,7 @@ export function CollectionsTable({
 
                     <TableCell>
                       <div>
-                        <p className="font-medium text-sm">
-                          {c.member.name}
-                        </p>
+                        <p className="font-medium text-sm">{c.member.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {c.member.memberId}
                         </p>
@@ -225,9 +213,7 @@ export function CollectionsTable({
 
                     <TableCell>
                       <div>
-                        <p className="text-sm">
-                          {c.donation.donorName}
-                        </p>
+                        <p className="text-sm">{c.donation.donorName}</p>
                         <p className="text-xs text-muted-foreground">
                           {c.donation.receiptNo}
                         </p>
@@ -266,11 +252,7 @@ export function CollectionsTable({
                     </TableCell>
 
                     <TableCell>
-                      <Badge
-                        variant={
-                          statusColors[c.status] ?? "outline"
-                        }
-                      >
+                      <Badge variant={statusColors[c.status] ?? "outline"}>
                         {c.status}
                       </Badge>
                     </TableCell>
@@ -280,48 +262,41 @@ export function CollectionsTable({
                     </TableCell>
 
                     <TableCell className="text-right">
-                      {isAdminOrAccountant &&
-                        c.status === "COLLECTED" && (
-                          <DepositCollectionButton
-                            collectionId={c.id}
-                            accounts={accounts}
-                          />
-                        )}
+                      {isAdminOrAccountant && c.status === "COLLECTED" && (
+                        <DepositCollectionButton
+                          collectionId={c.id}
+                          accounts={accounts}
+                        />
+                      )}
 
                       {isAdminOrAccountant &&
-                        ["DEPOSITED", "COLLECTED"].includes(
-                          c.status
-                        ) && (
+                        ["DEPOSITED", "COLLECTED"].includes(c.status) && (
                           <div className="ml-2 inline-block">
                             <VerifyCollectionButton
                               collectionId={c.id}
-                              collectedAmount={
-                                c.collectedAmount
-                              }
+                              collectedAmount={c.collectedAmount}
                             />
                           </div>
                         )}
 
-                      {isAdminOrAccountant &&
-                        c.status === "DISCREPANT" && (
-                          <div className="ml-2 inline-block">
-                            <DepositCollectionButton
-                              collectionId={c.id}
-                              accounts={accounts}
-                              recollectMode
-                              recollectAmount={shortage}
-                            />
-                          </div>
-                        )}
+                      {isAdminOrAccountant && c.status === "DISCREPANT" && (
+                        <div className="ml-2 inline-block">
+                          <DepositCollectionButton
+                            collectionId={c.id}
+                            accounts={accounts}
+                            recollectMode
+                            recollectAmount={shortage}
+                          />
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
-                )
+                );
               })
             )}
           </TableBody>
         </Table>
       </CardContent>
     </>
-  )
+  );
 }
-

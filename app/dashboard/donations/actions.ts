@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { ChequeNature, DonationCategory, PaymentMode } from "@prisma/client"
-import { requirePermission, requireAuth, hasPermission } from "@/lib/authorization"
+import { requirePermission } from "@/lib/authorization"
+import { assertDateNotClosed } from "@/lib/book-closure"
 
 async function recalculateBalancesForAccount(accountId: string) {
   const entries = await prisma.ledgerEntry.findMany({
@@ -45,6 +46,7 @@ export async function createDonation(data: z.infer<typeof donationSchema>) {
   try {
     await requirePermission("donations", "create")
     const validatedData = donationSchema.parse(data)
+    await assertDateNotClosed(new Date(), "Donation entry")
 
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "")
     const randomStr = Math.floor(1000 + Math.random() * 9000)

@@ -6,7 +6,7 @@ import QRCode from "qrcode"
 import { format } from "date-fns"
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -48,7 +48,7 @@ export async function GET(
       },
     })
 
-    return new NextResponse(readableStream as any, {
+    return new Response(readableStream, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="receipt-${donation.receiptNo}.pdf"`,
