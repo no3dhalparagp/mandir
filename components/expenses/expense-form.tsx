@@ -15,7 +15,18 @@ import { createExpense } from "@/app/dashboard/expenses/actions"
 
 const expenseSchema = z.object({
   title: z.string().min(2, "Title is required."),
-  category: z.string(),
+  category: z.enum([
+    "PUJA_MATERIALS",
+    "ELECTRICITY",
+    "SALARY",
+    "MAINTENANCE",
+    "DECORATION",
+    "FOOD_PRASAD",
+    "CONSTRUCTION",
+    "PRINTING",
+    "TRANSPORT",
+    "MISC",
+  ]),
   amount: z.number({ error: "Amount is required" }).min(1, "Amount must be positive"),
   vendorName: z.string().optional(),
   vendorMobile: z.string().optional(),
@@ -66,7 +77,10 @@ export function ExpenseForm({ onSuccess, accounts }: ExpenseFormProps) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Category</Label>
-          <Select onValueChange={(v) => setValue("category", v as string)} defaultValue="MISC">
+          <Select
+            onValueChange={(v) => setValue("category", v as ExpenseFormData["category"])}
+            defaultValue="MISC"
+          >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="PUJA_MATERIALS">Puja Materials</SelectItem>
