@@ -64,7 +64,7 @@ interface DonationFormProps {
 
 export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId, isAdminOrAccountant }: DonationFormProps) {
   const [isPending, startTransition] = React.useTransition()
-  const [paymentMode, setPaymentMode] = React.useState("CASH")
+  const [paymentMode, setPaymentMode] = React.useState<DonationFormData["paymentMode"]>("CASH")
 
   const {
     register, handleSubmit, setValue, formState: { errors },
@@ -169,7 +169,11 @@ export function DonationForm({ onSuccess, accounts, collectors, loggedInMemberId
         <div className="space-y-2">
           <Label>Payment Mode</Label>
           <Select
-            onValueChange={(v) => { setValue("paymentMode", v as DonationFormData["paymentMode"]); setPaymentMode(v) }}
+            onValueChange={(v) => {
+              const mode = v as DonationFormData["paymentMode"];
+              setValue("paymentMode", mode);
+              setPaymentMode(mode);
+            }}
             defaultValue="CASH"
           >
             <SelectTrigger><SelectValue /></SelectTrigger>
