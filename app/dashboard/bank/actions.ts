@@ -100,27 +100,48 @@ async function recalculateRunningBalances(
    GET ALL BANK ACCOUNTS
 ====================================================== */
 
-export async function getBankAccounts() {
-  await requirePermission(
-    "bank",
-    "read"
-  )
+export async function getAccountBalance(
+  accountId: string
+) {
+  const entries =
+    await prisma.ledgerEntry.findMany({
+      where: {
+        accountId,
 
-  return prisma.bankAccount.findMany({
-    orderBy: {
-      createdAt: "asc",
-    },
-
-    include: {
-      _count: {
-        select: {
-          ledgerEntries: true,
-          donations: true,
-          expenses: true,
-        },
+        OR: [
+          {
+            isCleared: true,
+          },
+          {
+            isCleared: null,
+          },
+        ],
       },
-    },
-  })
+
+      orderBy: [
+        {
+          date: "asc",
+        },
+        {
+          createdAt: "asc",
+        },
+      ],
+    })
+
+  let balance = 0
+
+  for (const entry of entries) {
+    const isDebit = [
+      "EXPENSE",
+      "TRANSFER_OUT",
+    ].includes(entry.type)
+
+    balance = isDebit
+      ? balance - Number(entry.amount)
+      : balance + Number(entry.amount)
+  }
+
+  return balance
 }
 
 /* ======================================================
