@@ -53,8 +53,8 @@ const setupSchema = z.object({
   accountId: z.string().min(1, "Select an account"),
   statementFromDate: z.date(),
   statementToDate: z.date(),
-  openingBalanceBank: z.coerce.number(),
-  closingBalanceBank: z.coerce.number(),
+  openingBalanceBank: z.number({ error: "Opening balance is required" }).min(0, "Cannot be negative"),
+  closingBalanceBank: z.number({ error: "Closing balance is required" }).min(0, "Cannot be negative"),
   notes: z.string().optional(),
 });
 
@@ -403,8 +403,11 @@ export function ReconciliationWizard({
             <Input
               type="number"
               step="0.01"
-              {...register("openingBalanceBank")}
+              {...register("openingBalanceBank", { valueAsNumber: true })}
             />
+            {errors.openingBalanceBank && (
+              <p className="text-xs text-destructive">{errors.openingBalanceBank.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -412,8 +415,11 @@ export function ReconciliationWizard({
             <Input
               type="number"
               step="0.01"
-              {...register("closingBalanceBank")}
+              {...register("closingBalanceBank", { valueAsNumber: true })}
             />
+            {errors.closingBalanceBank && (
+              <p className="text-xs text-destructive">{errors.closingBalanceBank.message}</p>
+            )}
           </div>
 
           <div className="space-y-2 col-span-2">
