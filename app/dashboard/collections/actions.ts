@@ -370,6 +370,7 @@ export async function markCollectionDeposited(
 /*                            Verify Collection                               */
 /* -------------------------------------------------------------------------- */
 
+
 export async function verifyCollection(
   collectionId: string,
   verifiedAmount: number,
@@ -377,34 +378,184 @@ export async function verifyCollection(
 ) {
   try {
     await requirePermission("collections", "verify")
+
     const user = await requireAuth()
 
     const collection = await prisma.memberCollection.findUnique({
-      where: { id: collectionId },
+      where: {
+        id: collectionId,
+      },
       include: {
         member: true,
-        donation: { include: { account: true } },
+        donation: {
+          include: {
+            account: true,
+          },
+        },
         depositedToAccount: true,
       },
     })
 
     if (!collection) {
-      return { error: "Collection not found." }
+      return {
+        error: "Collection not found.",
+      }
     }
 
-    const hasDiscrepancy = verifiedAmount !== collection.collectedAmount
+    const hasDiscrepancy =
+      verifiedAmount !== collection.collectedAmount
+
+    /* ---------------------------------------------------------- */
+    /* UPDATE COLLECTION STATUS                                   */
+    /* ---------------------------------------------------------- */
 
     await prisma.memberCollection.update({
-      where: { id: collectionId },
+      where: {
+        id: collectionId,
+      },
       data: {
-        status: hasDiscrepancy ? "DISCREPANT" : "VERIFIED",
+        status: hasDiscrepancy
+          ? "DISCREPANT"
+          : "VERIFIED",
+
         verifiedById: user.id,
+
         verifiedAt: new Date(),
+
         verifiedAmount,
-        discrepancyNote: hasDiscrepancy ? discrepancyNote : null,
+
+        discrepancyNote: hasDiscrepancy
+          ? discrepancyNote
+          : null,
       },
     })
 
+    /* ---------------------------------------------------------- */
+    /* POST VERIFIED AMOUNT                                       */
+    /* ---------------------------------------------------------- */
+
+    let targetAccountName:
+      | string
+      | undefined
+
+    let currentBalance:
+      | number
+      | undefined
+
+    if (verifiedAmount > 0) {
+      const donationAccount =
+        collection.donation?.account
+
+      if (!donationAccount) {
+        return {
+          error:
+            "No receipt account linked with donation.",
+        }
+      }
+
+      /* ------------------------------------------------------ */
+      /* CASH COLLECTION                                         */
+      /* ------------------------------------------------------ */
+
+      if (
+        donationAccount.accountType ===
+        AccountType.CASH_IN_HAND
+      ) {
+        await addVerifiedCollectionToCashAccount({
+          cashAccountId:
+            donationAccount.id,
+
+          amount: verifiedAmount,
+
+          collectionId,
+
+          collectorName:
+            collection.member?.name ??
+            undefined,
+        })
+
+        targetAccountName =
+          donationAccount.name
+
+        currentBalance =
+          await getAccountBalance(
+            donationAccount.id
+          )
+      }
+
+      /* ------------------------------------------------------ */
+      /* CHEQUE / BANK COLLECTION                                */
+      /* ------------------------------------------------------ */
+
+      else {
+        await prisma.ledgerEntry.create({
+          data: {
+            accountId:
+              donationAccount.id,
+
+            type: "INCOME",
+
+            amount: Number(
+              verifiedAmount
+            ),
+
+            description: `Cheque collection from ${
+              collection.member?.name ??
+              "member"
+            }`,
+
+            referenceId:
+              collectionId,
+
+            referenceType: "OTHER",
+
+            isCleared: false,
+
+            clearedAt: null,
+          },
+        })
+
+        await recalculateBalancesForAccount(
+          donationAccount.id
+        )
+
+        targetAccountName =
+          donationAccount.name
+
+        currentBalance =
+          await getAccountBalance(
+            donationAccount.id
+          )
+      }
+    }
+
+    revalidatePath(
+      "/dashboard/collections"
+    )
+
+    revalidatePath(
+      "/dashboard/bank"
+    )
+
+    revalidatePath(
+      "/dashboard/journal"
+    )
+
+    return {
+      success: true,
+      balance: currentBalance,
+      accountName:
+        targetAccountName,
+    }
+  } catch (error: unknown) {
+    return {
+      error: getErrorMessage(
+        error,
+        "Failed to verify collection."
+      ),
+    }
+  }
+}
     /* ---------------------------------------------------------------------- */
     /*                           Post To Cash Account                         */
     /* ---------------------------------------------------------------------- */
