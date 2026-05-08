@@ -12,9 +12,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Loader2 } from "lucide-react"
+import { Plus, Loader2, AlertCircle, Eye } from "lucide-react"
 import Link from "next/link"
 import { formatDate, formatINR } from "@/lib/utils"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export function MandiDonationsListComponent() {
   const [purpose, setPurpose] = useState("")
@@ -74,11 +75,16 @@ export function MandiDonationsListComponent() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin" />
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : error ? (
-        <div className="text-red-500">Failed to load donations</div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load donations. Please try again later.
+          </AlertDescription>
+        </Alert>
       ) : donations.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           No donations found
@@ -89,29 +95,43 @@ export function MandiDonationsListComponent() {
             <TableHeader>
               <TableRow>
                 <TableHead>Donation No</TableHead>
-                <TableHead>Devotee</TableHead>
+                <TableHead>Donor</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Purpose</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Receipt</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {donations.map((donation: any) => (
-                <TableRow key={donation.id}>
+                <TableRow key={donation.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">{donation.donationNo}</TableCell>
-                  <TableCell>{donation.devotee?.name || donation.donorName || "-"}</TableCell>
+                  <TableCell className="text-sm">{donation.devotee?.name || donation.donorName || "Anonymous"}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">{donation.donationType}</Badge>
+                    <Badge variant="outline" className="whitespace-nowrap">{donation.donationType}</Badge>
                   </TableCell>
-                  <TableCell>{donation.purpose}</TableCell>
-                  <TableCell>{formatINR(donation.amount)}</TableCell>
-                  <TableCell>{formatDate(donation.donationDate)}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{donation.purpose}</TableCell>
+                  <TableCell className="text-right font-semibold">{formatINR(donation.amount)}</TableCell>
+                  <TableCell className="text-sm">{formatDate(donation.donationDate)}</TableCell>
                   <TableCell>
-                    <Badge variant={donation.acknowledgmentSent ? "default" : "outline"}>
+                    <Badge variant={donation.acknowledgmentSent ? "default" : "secondary"} className="whitespace-nowrap">
                       {donation.acknowledgmentSent ? "Sent" : "Pending"}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Link href={`/dashboard/mandir-donations/${donation.id}`}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

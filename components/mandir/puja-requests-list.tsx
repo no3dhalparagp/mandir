@@ -12,9 +12,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Loader2 } from "lucide-react"
+import { Plus, Loader2, AlertCircle, Eye } from "lucide-react"
 import Link from "next/link"
-import { formatDate } from "@/lib/utils"
+import { formatDate, formatINR } from "@/lib/utils"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export function PujaRequestsListComponent() {
   const [status, setStatus] = useState("")
@@ -78,11 +79,16 @@ export function PujaRequestsListComponent() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin" />
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : error ? (
-        <div className="text-red-500">Failed to load puja requests</div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load puja requests. Please try again later.
+          </AlertDescription>
+        </Alert>
       ) : requests.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           No puja requests found
@@ -96,25 +102,41 @@ export function PujaRequestsListComponent() {
                 <TableHead>Devotee</TableHead>
                 <TableHead>Puja Type</TableHead>
                 <TableHead>Deity</TableHead>
-                <TableHead>Requested Date</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Cost</TableHead>
+                <TableHead className="text-right">Cost</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {requests.map((request: any) => (
-                <TableRow key={request.id}>
+                <TableRow key={request.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">{request.requestNo}</TableCell>
                   <TableCell>{request.devotee?.name}</TableCell>
-                  <TableCell>{request.pujaType}</TableCell>
-                  <TableCell>{request.deityName || "-"}</TableCell>
-                  <TableCell>{formatDate(request.requestedDate)}</TableCell>
+                  <TableCell className="text-sm">{request.pujaType}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{request.deityName || "-"}</TableCell>
+                  <TableCell className="text-sm">{formatDate(request.requestedDate)}</TableCell>
                   <TableCell>
-                    <Badge variant={getStatusColor(request.status)}>
+                    <Badge variant={getStatusColor(request.status)} className="whitespace-nowrap">
                       {request.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>₹{request.actualCost || request.estimatedCost || 0}</TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {formatINR(request.actualCost || request.estimatedCost || 0)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Link href={`/dashboard/puja-requests/${request.id}`}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </Link>
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

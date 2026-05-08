@@ -13,9 +13,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Plus, Search, Loader2, AlertCircle, Eye } from "lucide-react"
 import Link from "next/link"
-import { formatDate } from "@/lib/utils"
+import { formatDate, formatINR } from "@/lib/utils"
 
 export function DevoteesListComponent() {
   const [search, setSearch] = useState("")
@@ -59,11 +60,16 @@ export function DevoteesListComponent() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin" />
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : error ? (
-        <div className="text-red-500">Failed to load devotees</div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load devotees. Please try again later.
+          </AlertDescription>
+        </Alert>
       ) : devotees.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           No devotees found
@@ -74,20 +80,22 @@ export function DevoteesListComponent() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Mobile</TableHead>
+                <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Total Donations</TableHead>
-                <TableHead>Pujas</TableHead>
+                <TableHead className="text-right">Donations</TableHead>
+                <TableHead className="text-right">Pujas</TableHead>
                 <TableHead>Joined</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {devotees.map((devotee: any) => (
-                <TableRow key={devotee.id}>
+                <TableRow key={devotee.id} className="hover:bg-muted/50 cursor-pointer">
                   <TableCell className="font-medium">{devotee.name}</TableCell>
-                  <TableCell>{devotee.email || "-"}</TableCell>
-                  <TableCell>{devotee.mobile || "-"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    <div>{devotee.email || "-"}</div>
+                    <div>{devotee.mobile || "-"}</div>
+                  </TableCell>
                   <TableCell>
                     <Badge
                       variant={
@@ -95,15 +103,33 @@ export function DevoteesListComponent() {
                           ? "default"
                           : devotee.status === "LIFETIME"
                           ? "secondary"
+                          : devotee.status === "SUSPENDED"
+                          ? "destructive"
                           : "outline"
                       }
+                      className="whitespace-nowrap"
                     >
                       {devotee.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>₹{devotee.totalDonations || 0}</TableCell>
-                  <TableCell>{devotee.totalPujas || 0}</TableCell>
-                  <TableCell>{formatDate(devotee.joiningDate)}</TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {formatINR(devotee.totalDonations || 0)}
+                  </TableCell>
+                  <TableCell className="text-right">{devotee.totalPujas || 0}</TableCell>
+                  <TableCell className="text-sm">{formatDate(devotee.joiningDate)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Link href={`/dashboard/devotees/${devotee.id}`}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </Link>
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
