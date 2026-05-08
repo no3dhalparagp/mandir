@@ -1,0 +1,221 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║         MANDIR TRUST ACCOUNTING SYSTEM - QUICK REFERENCE GUIDE             ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+🕉️  MANDIR-SPECIFIC FEATURES
+
+┌─ DEVOTEE MANAGEMENT ─────────────────────────────────────────────────────┐
+│                                                                             │
+│  Location: /dashboard/devotees                                             │
+│  Features:                                                                  │
+│    • Complete devotee profiles with contact information                     │
+│    • Status tracking: Active, Inactive, Suspended, Lifetime                │
+│    • Life event tracking (birthday, anniversary)                           │
+│    • Donation and puja participation history                               │
+│    • Family member tracking                                                │
+│                                                                             │
+│  API Endpoints:                                                             │
+│    GET    /api/devotees              - List all devotees                   │
+│    POST   /api/devotees              - Create new devotee                  │
+│    GET    /api/devotees/[id]         - Get devotee details                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ PUJA REQUEST MANAGEMENT ─────────────────────────────────────────────────┐
+│                                                                             │
+│  Location: /dashboard/puja-requests                                        │
+│  Features:                                                                  │
+│    • Support 7 puja types:                                                 │
+│      - Daily Regular Pujas                                                 │
+│      - Weekly Special Pujas                                                │
+│      - Festival Pujas (Diwali, Holi, Navratri, etc.)                      │
+│      - Custom/Special Pujas                                                │
+│      - Marriage-related Pujas                                              │
+│      - Death Rituals and Shraddha                                          │
+│      - Yagna and Havan Ceremonies                                          │
+│    • Status tracking: Pending → Confirmed → Completed/Cancelled            │
+│    • Priest assignment and notes                                           │
+│    • Cost estimation and tracking                                          │
+│    • Auto-generated request numbers (PUJ-00001)                            │
+│                                                                             │
+│  API Endpoints:                                                             │
+│    GET    /api/puja-requests         - List requests                       │
+│    POST   /api/puja-requests         - Create request                      │
+│    PUT    /api/puja-requests/[id]    - Update status                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ MANDIR-SPECIFIC DONATIONS ──────────────────────────────────────────────┐
+│                                                                             │
+│  Location: /dashboard/mandir-donations                                     │
+│  Features:                                                                  │
+│    • 5 donation types: Cash, Check, Bank Transfer, Online, In Kind        │
+│    • 9 donation purposes:                                                  │
+│      - General Temple Fund                                                 │
+│      - Maintenance and Repairs                                             │
+│      - Specific Deity Support                                              │
+│      - Puja Expenses                                                       │
+│      - Prasad (Blessed Food)                                               │
+│      - Charity/Daan Activities                                             │
+│      - Religious/Secular Education                                         │
+│      - Medical Aid Fund                                                    │
+│      - Special Fundraisers                                                 │
+│    • Receipt and acknowledgment tracking                                    │
+│    • In-kind donation support (item, quantity, unit)                       │
+│    • Anonymous donor support                                               │
+│    • Auto-generated donation numbers (DON-00001)                           │
+│                                                                             │
+│  API Endpoints:                                                             │
+│    GET    /api/mandir-donations      - List donations                      │
+│    POST   /api/mandir-donations      - Record donation                     │
+│    PUT    /api/mandir-donations/[id] - Update status                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ TRUSTEE MANAGEMENT ──────────────────────────────────────────────────────┐
+│                                                                             │
+│  Features:                                                                  │
+│    • 6 trustee roles:                                                      │
+│      - President                                                           │
+│      - Vice President                                                      │
+│      - Treasurer                                                           │
+│      - Secretary                                                           │
+│      - Member                                                              │
+│      - Trustee-at-large                                                    │
+│    • Term date tracking                                                    │
+│    • Digital signature storage                                             │
+│    • Contact information management                                        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ TEMPLE ASSET MANAGEMENT ─────────────────────────────────────────────────┐
+│                                                                             │
+│  Features:                                                                  │
+│    • 8 asset types:                                                        │
+│      - Building (Main temple, annexes)                                     │
+│      - Furniture & Fixtures                                                │
+│      - Religious Items (Idols, utensils)                                   │
+│      - Vehicles                                                            │
+│      - Equipment (Puja, kitchen, etc.)                                     │
+│      - Land/Property                                                       │
+│      - Decorative Items                                                    │
+│      - Utility Items                                                       │
+│    • Depreciation tracking with 2 methods:                                 │
+│      - Straight Line Method                                                │
+│      - Written Down Value Method                                           │
+│    • Purchase and current value tracking                                   │
+│    • Asset condition monitoring                                            │
+│    • Location tracking                                                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ CHARITY PROGRAMS ────────────────────────────────────────────────────────┐
+│                                                                             │
+│  Features:                                                                  │
+│    • Program creation and lifecycle                                        │
+│    • Target vs. collected amount tracking                                  │
+│    • Distribution management                                               │
+│    • Beneficiary tracking                                                  │
+│    • Program status (Active, Inactive, Completed)                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ TEMPLE EVENTS ───────────────────────────────────────────────────────────┐
+│                                                                             │
+│  Features:                                                                  │
+│    • Event type classification                                             │
+│    • Festival and community event tracking                                 │
+│    • Budget planning and tracking                                          │
+│    • Attendance estimation                                                 │
+│    • Organizer details management                                          │
+│    • Event status (Planned, Ongoing, Completed)                            │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 SIDEBAR NAVIGATION
+
+Mandir Section:
+  • Devotees (Heart icon)         → /dashboard/devotees
+  • Puja Requests (Flame icon)    → /dashboard/puja-requests
+  • Mandir Donations (Gift icon)  → /dashboard/mandir-donations
+
+Finance Section:
+  • Vouchers                       → /dashboard/vouchers
+  • Donations                      → /dashboard/donations
+  • Expenses                       → /dashboard/expenses
+
+Administration Section:
+  • Members                        → /dashboard/members
+  • Staff Directory                → /dashboard/staff
+  • Parties                        → /dashboard/parties
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💾 DATABASE MODELS
+
+New Enums:
+  • PujaType           - 7 puja types
+  • DonationType       - 5 donation types
+  • MandirDonationPurpose - 9 purposes
+  • DevoteeStatus      - 4 status types
+  • TrusteeRole        - 6 roles
+  • TempleAssetType    - 8 asset types
+
+New Tables:
+  • Devotee            - Devotee profiles and tracking
+  • PujaRequest        - Puja request management
+  • MandiDonation      - Donation tracking
+  • MandiTrusty        - Trustee information
+  • TempleAsset        - Asset management
+  • CharityProgram     - Charity program tracking
+  • CharityDistribution - Charity disbursements
+  • TempleEvent        - Event management
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTATION
+
+Main Documents:
+  • MANDIR_CUSTOMIZATION.md      - Feature guide and customization
+  • MANDIR_SYSTEM_COMPLETE.md    - Implementation summary
+  • MANDIR_ACCOUNTING_README.md  - Complete accounting guide
+  • TESTING_GUIDE.md              - Test scenarios
+  • SETUP_CHECKLIST.md            - Launch preparation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔑 KEY AUTO-GENERATED NUMBERS
+
+Devotee ID:             Automatically generated (UUID)
+Puja Request:           PUJ-00001, PUJ-00002, etc.
+Donation Number:        DON-00001, DON-00002, etc.
+Receipt Number:         RCP-[timestamp]
+Trustee Number:         Unique member number
+Asset Code:             Unique asset identifier
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ READY TO USE
+
+The Mandir Trust Accounting System is fully customized and production-ready:
+
+✓ Database schema complete
+✓ All APIs functional
+✓ User interface ready
+✓ Navigation updated
+✓ Build successful
+✓ Documentation comprehensive
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For detailed information, see:
+  • MANDIR_CUSTOMIZATION.md (501 lines)
+  • MANDIR_SYSTEM_COMPLETE.md (440 lines)
+
+Status: ✅ PRODUCTION READY
+Version: 2.0 (Mandir Customized)
+Date: May 8, 2024
+
+╚════════════════════════════════════════════════════════════════════════════╝

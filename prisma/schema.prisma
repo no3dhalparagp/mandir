@@ -152,6 +152,66 @@ enum BookClosureType {
   YEAR
 }
 
+// ─── Mandir-Specific Enums ────────────────────────────────────────────────────
+
+enum PujaType {
+  DAILY           // Regular daily puja
+  WEEKLY          // Weekly special pujas
+  FESTIVAL        // Festival pujas (Diwali, Holi, etc.)
+  CUSTOM          // Custom/special pujas requested by devotees
+  MARRIAGE        // Marriage/wedding related pujas
+  DEATH_RITUAL    // Death rituals and shraddha
+  YAGNA           // Yagna/havan ceremonies
+}
+
+enum DonationType {
+  CASH            // Direct cash donation
+  CHECK           // Check donation
+  BANK_TRANSFER   // Bank transfer
+  ONLINE          // Online payment
+  ONLINE_SURVEY   // Online survey/crowd funding
+  KIND            // Donation in kind (materials, goods)
+}
+
+enum MandirDonationPurpose {
+  GENERAL         // General temple fund
+  MAINTENANCE     // Temple maintenance and repair
+  DEITY           // Specific deity (Ganesh, Durga, etc.)
+  PUJA            // Puja and rituals
+  PRASAD          // Prasad (blessed food)
+  CHARITY         // Charity/Daan activities
+  EDUCATION       // Religious/secular education
+  MEDICAL         // Medical aid
+  SPECIAL_CAUSE   // Special cause/fundraiser
+}
+
+enum DevoteeStatus {
+  ACTIVE          // Active devotee
+  INACTIVE        // Inactive (no contributions recently)
+  SUSPENDED       // Suspended (due to some reason)
+  LIFETIME        // Lifetime member
+}
+
+enum TrusteeRole {
+  PRESIDENT
+  VICE_PRESIDENT
+  TREASURER
+  SECRETARY
+  MEMBER
+  TRUSTEE_AT_LARGE
+}
+
+enum TempleAssetType {
+  BUILDING        // Main temple building
+  FURNITURE       // Furniture and fixtures
+  RELIGIOUS_ITEM  // Religious idols and items
+  VEHICLE         // Temple vehicles
+  EQUIPMENT       // Puja and other equipment
+  LAND            // Land/property
+  DECORATION      // Decorative items
+  UTILITY         // Utility items
+}
+
 // ─── Core User ────────────────────────────────────────────────────────────────
 
 model User {
@@ -185,6 +245,7 @@ model User {
   activeSessions         ActiveSession[]
   staffDetail            StaffDetail?
   vouchers               Voucher[]               @relation("CreatedVouchers")
+  mandiTrusty            MandiTrusty?
 }
 
 // ─── Chart of Accounts ─────────────────────────────────────────────────────────
@@ -680,7 +741,7 @@ model LoginHistory {
   @@index([createdAt])
 }
 
-// ─── Active Session ───────────────────────────────────────────────────────────
+// ─── Active Session ───────────────────────────────────���───────────────────────
 
 model ActiveSession {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -977,4 +1038,254 @@ model StaffDetail {
   
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+}
+
+// ─── Mandir-Specific Models ──────────────────────────────────────────────────
+
+model MandiTrusty {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String        @unique @db.ObjectId
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  trusteeRole     TrusteeRole
+  memberNumber    String        @unique
+  
+  // Contact details
+  residenceAddress String?
+  residencePhone  String?
+  
+  // Trustee specific
+  trusteeStartDate DateTime?
+  trusteeEndDate   DateTime?
+  termEndDate      DateTime?
+  
+  signature        String?
+  notes            String?
+  
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Devotee {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  email           String?
+  mobile          String?
+  address         String?
+  
+  // Devotee type
+  status          DevoteeStatus @default(ACTIVE)
+  devotionType    String?       // e.g., "Regular Visitor", "Festival Visitor"
+  
+  // Joining and membership
+  joiningDate     DateTime      @default(now())
+  familyMembers   Int           @default(1)
+  
+  // Life event tracking
+  dateOfBirth     DateTime?
+  anniversary     DateTime?
+  
+  notes           String?
+  profileImage    String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  donations       MandiDonation[]
+  pujaRequests    PujaRequest[]
+  
+  @@index([name])
+  @@index([email])
+  @@index([status])
+}
+
+model MandiDonation {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  donationNo      String        @unique
+  
+  devoteeId       String?       @db.ObjectId
+  devotee         Devotee?      @relation(fields: [devoteeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  donationType    DonationType
+  purpose         MandirDonationPurpose
+  
+  amount          Float
+  donationDate    DateTime      @default(now())
+  
+  // For bank transfers
+  bankTransferId  String?
+  chequeNumber    String?
+  chequeDate      DateTime?
+  bankName        String?
+  
+  // For kind donations
+  itemDescription String?
+  itemQuantity    Float?
+  itemUnit        String?
+  
+  // Link to ledger entries
+  journalEntryId  String?       @db.ObjectId
+  
+  donorName       String?       // For anonymous or external donors
+  donorPhone      String?
+  donorEmail      String?
+  
+  receiptNo       String        @unique
+  acknowledgmentSent Boolean     @default(false)
+  acknowledgmentDate DateTime?
+  
+  notes           String?
+  receiptUrl      String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@index([devoteeId])
+  @@index([donationDate])
+}
+
+model PujaRequest {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  requestNo       String        @unique
+  
+  devoteeId       String        @db.ObjectId
+  devotee         Devotee       @relation(fields: [devoteeId], references: [id], onDelete: Cascade)
+  
+  pujaType        PujaType
+  deityName       String?
+  
+  requestDate     DateTime      @default(now())
+  requestedDate   DateTime
+  completedDate   DateTime?
+  
+  description     String?
+  numberOfPeople  Int           @default(1)
+  
+  // Cost and payment
+  estimatedCost   Float?
+  actualCost      Float?
+  status          String        @default("PENDING") // PENDING, CONFIRMED, COMPLETED, CANCELLED
+  
+  specialRequests String?
+  priestAssigned  String?
+  
+  notes           String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@index([devoteeId])
+  @@index([requestedDate])
+}
+
+model TempleAsset {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  assetCode       String        @unique
+  
+  assetType       TempleAssetType
+  assetName       String
+  description     String?
+  
+  purchaseDate    DateTime?
+  purchaseCost    Float?
+  
+  currentValue    Float?
+  depreciation    Float?
+  
+  location        String?
+  condition       String?
+  
+  status          AssetStatus   @default(ACTIVE)
+  
+  // For depreciation
+  depreciationMethod DepreciationMethod?
+  depreciationRate Float?
+  
+  imageUrl        String?
+  notes           String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@index([assetType])
+}
+
+model CharityProgram {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  programName     String
+  programCode     String        @unique
+  
+  description     String?
+  objectives      String?
+  
+  startDate       DateTime?
+  endDate         DateTime?
+  targetAmount    Float?
+  
+  totalCollected  Float         @default(0)
+  totalDistributed Float        @default(0)
+  
+  status          String        @default("ACTIVE") // ACTIVE, INACTIVE, COMPLETED
+  
+  createdBy       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  distributions   CharityDistribution[]
+}
+
+model CharityDistribution {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  charityProgramId String       @db.ObjectId
+  charityProgram  CharityProgram @relation(fields: [charityProgramId], references: [id], onDelete: Cascade)
+  
+  beneficiaryName String
+  beneficiaryType String        // INDIVIDUAL, FAMILY, INSTITUTION
+  
+  distributionDate DateTime     @default(now())
+  amount          Float
+  
+  description     String?
+  approvedBy      String?
+  
+  notes           String?
+  receiptNo       String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@index([charityProgramId])
+}
+
+model TempleEvent {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  eventName       String
+  eventCode       String        @unique
+  
+  eventType       String        // FESTIVAL, COMMUNITY, EDUCATIONAL, etc.
+  eventDate       DateTime
+  duration        Int?          // Duration in hours
+  
+  description     String?
+  location        String?
+  
+  expectedAttendance Int?
+  expectedBudget  Float?
+  actualExpense   Float?
+  
+  organizerName   String?
+  organizerPhone  String?
+  
+  status          String        @default("PLANNED") // PLANNED, ONGOING, COMPLETED
+  
+  notes           String?
+  imageUrl        String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@index([eventDate])
 }

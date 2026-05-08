@@ -27,6 +27,10 @@ import {
   Receipt,
   Users2,
   Building,
+  Heart,
+  Flame,
+  Gift,
+  Landmark as TempleIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -143,6 +147,14 @@ const navGroups: NavGroup[] = [
       { title: "Staff Directory", url: "/dashboard/staff", icon: Users2 },
       { title: "Parties", url: "/dashboard/parties", icon: Building },
       { title: "Events & Pujas", url: "/dashboard/events", icon: Calendar },
+    ],
+  },
+  {
+    label: "Mandir",
+    items: [
+      { title: "Devotees", url: "/dashboard/devotees", icon: Heart },
+      { title: "Puja Requests", url: "/dashboard/puja-requests", icon: Flame },
+      { title: "Mandir Donations", url: "/dashboard/mandir-donations", icon: Gift },
     ],
   },
   {
