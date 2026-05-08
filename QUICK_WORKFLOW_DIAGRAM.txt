@@ -1,0 +1,406 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║              MANDIR TRUST ACCOUNTING SYSTEM - WORKFLOW OVERVIEW             ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         SYSTEM ENTRY POINTS                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    [DEVOTEES]          [STAFF]            [ADMIN]
+        │                  │                  │
+        ├─ Register        ├─ Manage          ├─ Configure
+        ├─ Track           ├─ Bank Details    ├─ Reports
+        └─ Donations       └─ Salaries        └─ Users
+
+        ▼                   ▼                   ▼
+    ┌────────────────────────────────────────────────┐
+    │        AUTHENTICATION (NextAuth)               │
+    │  Email/Password → JWT Token → Session         │
+    └────────────────────────────────────────────────┘
+        │                   │                   │
+        ├─ ROLE: MEMBER    ├─ ROLE: ADMIN     ├─ ROLE: SUPER
+        ├─ Limited Access  ├─ Full Access     ├─ Full Control
+        └─ Own Data Only   └─ All Data        └─ System Config
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         CORE WORKFLOWS                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW 1: VOUCHER POSTING
+─────────────────────────────
+
+User Creates Voucher
+  ├─ Select Type: Cash Entry, Payment, Collection, Journal
+  ├─ Fill Details: Amount, Accounts, Date
+  ├─ Map GL Accounts: Debit & Credit
+  └─ Status: DRAFT
+    │
+    ▼
+Validation Layer
+  ├─ Client: Zod Schema Check
+  ├─ Server: Auth, Business Rules
+  └─ Double-Entry: Debits = Credits
+    │
+    ▼
+Save to Database (Draft)
+  └─ Voucher Number: VCH-YYYY-MM-001
+    │
+    ▼
+User Reviews & Posts
+  └─ Click "Post Voucher"
+    │
+    ▼
+GL Posting Transaction
+  ├─ Create Journal Entries
+  ├─ Update Account Balances
+  ├─ Update Party Ledger
+  ├─ Update Bank Accounts
+  └─ Record Audit Log
+    │
+    ▼
+Status: POSTED
+  ├─ Visible in GL Report
+  ├─ Visible in Party Ledger
+  ├─ Visible in Cash Book
+  └─ Final & Non-Editable
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW 2: DEVOTEE MANAGEMENT
+───────────────────────────────
+
+Register New Devotee
+  ├─ Name, Contact, Address
+  ├─ Status: Active/Inactive/Suspended/Lifetime
+  ├─ Family Members
+  └─ Life Events: Birthday, Anniversary
+    │
+    ▼
+Devotee Profile Created
+  ├─ Unique ID Assigned
+  ├─ Joining Date Recorded
+  └─ Available for Linkage
+    │
+    ▼
+Track Activities
+  ├─ Donations:
+  │  ├─ Amount, Date, Purpose
+  │  ├─ Receipt Generated
+  │  └─ Acknowledgment Sent
+  │
+  ├─ Puja Requests:
+  │  ├─ Type, Date, Priest
+  │  ├─ Cost Tracking
+  │  └─ Status Updates
+  │
+  └─ Engagement:
+     ├─ Last Visit Tracked
+     ├─ Total Contributions
+     └─ Metrics Calculated
+    │
+    ▼
+View Complete Profile
+  ├─ All Donations
+  ├─ All Pujas
+  ├─ Total Contributions
+  └─ Communication History
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW 3: DONATION RECORDING
+───────────────────────────────
+
+Donation Received
+  ├─ Type: Cash, Check, Bank, Online, In-Kind
+  └─ From: Devotee or Anonymous
+    │
+    ▼
+Record Donation
+  ├─ Amount (or Item Description)
+  ├─ Purpose: 9 Options
+  │  ├─ General, Maintenance, Deity
+  │  ├─ Puja, Prasad, Charity
+  │  ├─ Education, Medical, Special
+  │  └─ Select One
+  ├─ Donor Info (if not devotee)
+  └─ Special Notes
+    │
+    ▼
+Generate Numbers
+  ├─ Donation No: DON-00001
+  └─ Receipt No: RCP-TIMESTAMP
+    │
+    ▼
+GL Posting
+  ├─ Debit: Cash/Bank Account
+  ├─ Credit: Donation Revenue (by purpose)
+  └─ Reference: Donation Number
+    │
+    ▼
+Generate Receipt
+  ├─ Receipt Number
+  ├─ Amount, Date, Purpose
+  ├─ Donor Name
+  ├─ Temple Details
+  └─ Can be Printed/Emailed
+    │
+    ▼
+Send Acknowledgment
+  ├─ Email to Donor
+  ├─ Receipt Attached
+  ├─ Tax Info (if applicable)
+  └─ Status: ACKNOWLEDGMENT_SENT
+    │
+    ▼
+Donation Appears in Reports
+  ├─ Donation List
+  ├─ Devotee Profile
+  ├─ GL Reports
+  └─ Financial Reports
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW 4: PUJA REQUEST PROCESSING
+─────────────────────────────────────
+
+Devotee Submits Request
+  ├─ Puja Type: 7 Types
+  │  ├─ Daily, Weekly, Festival
+  │  ├─ Custom, Marriage
+  │  ├─ Death Ritual, Yagna
+  ├─ Deity Name (Optional)
+  ├─ Requested Date
+  ├─ Number of People
+  └─ Special Requests
+    │
+    ▼
+Generate Request Number
+  └─ PUJ-00001, PUJ-00002
+    │
+    ▼
+Status: PENDING
+  ├─ Awaiting Admin Confirmation
+  ├─ Can be Modified by Requester
+  └─ Displayed to Admin
+    │
+    ▼
+Admin Review & Confirmation
+  ├─ View Request
+  ├─ Assign Priest
+  ├─ Set Confirmed Date
+  ├─ Estimate Cost
+  └─ Status: CONFIRMED
+    │
+    ▼
+Puja Execution
+  ├─ Priest Performs Puja
+  ├─ Duration Recorded
+  ├─ Special Notes Added
+  └─ Completed
+    │
+    ▼
+Record Actual Cost
+  ├─ If Actual < Estimated: Refund
+  ├─ If Actual > Estimated: Charge Extra
+  └─ If Equal: No Adjustment
+    │
+    ▼
+Status: COMPLETED
+  ├─ Receipt Generated
+  ├─ GL Posted (if cost)
+  └─ Final Record
+    │
+    ▼
+Appear in Reports
+  ├─ Devotee Profile
+  ├─ Puja Statistics
+  ├─ Revenue Reports
+  └─ Priest Metrics
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WORKFLOW 5: FINANCIAL RECONCILIATION
+──────────────────────────────────────
+
+Daily Close
+  └─ All Vouchers Posted
+    │
+    ▼
+GL Reconciliation
+  ├─ Extract All Journal Entries
+  ├─ Sum All Debits
+  ├─ Sum All Credits
+  ├─ Compare: Debit = Credit?
+  └─ If No: Investigate & Fix
+    │
+    ▼
+Trial Balance
+  ├─ All Accounts Balanced
+  ├─ Assets = Liabilities + Equity
+  └─ Verified ✓
+    │
+    ▼
+Generate Reports
+  ├─ GL Report
+  ├─ Party Ledger
+  ├─ Cash Book
+  ├─ Bank Passbook
+  └─ Financial Statement
+    │
+    ▼
+Record in Audit Log
+  └─ Reconciliation Completed
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                      DATA FLOW: REQUEST TO DATABASE                          │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────┐
+│ React Component  │
+│  (Form Input)    │
+└────────┬─────────┘
+         │ JSON Data
+         ▼
+┌──────────────────────────┐
+│ Client Validation        │
+│ (Zod Schema)             │
+└────────┬─────────────────┘
+         │ If Valid
+         ▼
+┌──────────────────────────────┐
+│ API POST Request             │
+│ /api/endpoint                │
+│ Headers: Auth Token          │
+└────────┬─────────────────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ NextAuth Verification        │
+│ Check JWT Token              │
+└────────┬─────────────────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ Role-Based Access Control    │
+│ Check User Permissions       │
+└────────┬─────────────────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ Server Validation            │
+│ Business Logic Checks        │
+│ Double-Entry Verification    │
+└────────┬─────────────────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ Prisma ORM                   │
+│ Build Database Queries       │
+└────────┬─────────────────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ MongoDB Transaction          │
+│ • Insert Records             │
+│ • Update Balances            │
+│ • Commit or Rollback         │
+└────────┬─────────────────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ API Response                 │
+│ Status: 200 OK               │
+│ Body: Created Record         │
+└────────┬─────────────────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ SWR Hook (Client)            │
+│ Update Cache                 │
+└────────┬─────────────────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ React Component              │
+│ Re-render with New Data      │
+└────────┬─────────────────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ User Sees Result             │
+│ Item in List                 │
+│ Success Message              │
+└──────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         KEY SYSTEM FEATURES                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+✓ AUTHENTICATION & SECURITY
+  ├─ JWT Token-based
+  ├─ Role-Based Access Control
+  ├─ Encrypted Passwords (Bcrypt)
+  └─ HTTP-Only Cookies
+
+✓ DATA INTEGRITY
+  ├─ ACID Transactions
+  ├─ Double-Entry Accounting
+  ├─ Unique Constraints
+  ├─ Foreign Key Relationships
+  └─ Audit Logging
+
+✓ ERROR HANDLING
+  ├─ Client-side Validation (Zod)
+  ├─ Server-side Validation
+  ├─ Transaction Rollback
+  ├─ Detailed Error Messages
+  └─ Logging
+
+✓ PERFORMANCE
+  ├─ Indexed Queries
+  ├─ Connection Pooling
+  ├─ Client-side Caching (SWR)
+  ├─ Optimized SQL
+  └─ Pagination Ready
+
+✓ USABILITY
+  ├─ Intuitive Navigation
+  ├─ Real-time Feedback
+  ├─ Auto-generated Numbers
+  ├─ Status Tracking
+  └─ Print/Export
+
+✓ REPORTING
+  ├─ GL Reports
+  ├─ Party Ledger
+  ├─ Cash Book
+  ├─ Financial Statements
+  └─ Custom Reports
+
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                           SYSTEM SUMMARY                                   ║
+╠════════════════════════════════════════════════════════════════════════════╣
+║                                                                             ║
+║ Input Source ──→ Validation ──→ Processing ──→ Storage ──→ Reporting      ║
+║                                                                             ║
+║ Components:                                                                 ║
+║  • React Frontend (User Interface)                                          ║
+║  • Next.js API Routes (Business Logic)                                      ║
+║  • Prisma ORM (Data Access)                                                 ║
+║  • MongoDB (Database)                                                       ║
+║  • NextAuth (Authentication)                                                ║
+║                                                                             ║
+║ All operations maintain:                                                    ║
+║  ✓ Data Integrity                                                           ║
+║  ✓ Security                                                                 ║
+║  ✓ Audit Trails                                                             ║
+║  ✓ Performance                                                              ║
+║  ✓ Usability                                                                ║
+║                                                                             ║
+╚════════════════════════════════════════════════════════════════════════════╝
